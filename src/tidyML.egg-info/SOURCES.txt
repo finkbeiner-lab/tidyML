@@ -1,0 +1,11 @@
+README.md
+pyproject.toml
+setup.cfg
+src/tidyML/__init__.py
+src/tidyML/dataMediator.py
+src/tidyML/experimentTracker.py
+src/tidyML/hyperparameterOptimizer.py
+src/tidyML.egg-info/PKG-INFO
+src/tidyML.egg-info/SOURCES.txt
+src/tidyML.egg-info/dependency_links.txt
+src/tidyML.egg-info/top_level.txt

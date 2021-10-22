@@ -4,7 +4,6 @@ and control data for machine learning pipelines.
 """
 
 from typing import Callable, Optional, Union
-from types import SimpleNamespace
 import pandas as pd
 from pandas import DataFrame
 

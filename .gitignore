@@ -1,2 +1,9 @@
 # Python
-__pycache__
+__pycache__/
+.venv/
+
+# Builds
+dist/
+
+# Operating system
+.DS_Store
