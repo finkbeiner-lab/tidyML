@@ -1,7 +1,7 @@
 # tidyML
 
 Machine learning pipelines are too often built from spaghetti. This package provides utilities to consolidate logic
-and minimize duplication, which helps us write maintainable code.
+and minimize duplication, which helps you write maintainable code.
 
 ## Modules
 
