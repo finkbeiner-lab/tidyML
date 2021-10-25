@@ -6,6 +6,8 @@ and control data for machine learning pipelines.
 from typing import Callable, Optional, Union
 import pandas as pd
 from pandas import DataFrame
+import numpy as np
+from sklearn.model_selection import train_test_split
 
 class DataMediator:
     """
@@ -175,6 +177,19 @@ class DataMediator:
             self.__balance(self.balancingMethod, self.balancingMethodCallback)
         if self.holdoutProportion:
             self.__createHoldout(self.holdoutProportion)
+
+    def trainTestSplit(self, proportion: float, columnsToDrop: list = list()) -> None:
+        """
+        Split experimental and control data by a given proportion into training/testing sets, with 
+        classification targets. Access using class variables— training data with `trainingData`, 
+        training classes with `trainingClasses`, testing data with `testingData`, and testing classes 
+        with `testingClasses`.
+        """
+        totalData = pd.concat([self.controlData, self.experimentalData])
+        totalClasses = np.array([0] * len(self.controlData) + [1] * len(self.experimentalData))
+        totalData.drop(columnsToDrop, axis=1, inplace=True)
+        self.trainingData, self.testingData, self.trainingClasses, self.testingClasses = train_test_split(
+            totalData.astype(float), totalClasses, test_size=proportion)
 
     def filter(self, filterMap: Union[DataFrame, dict]) -> None:
         """

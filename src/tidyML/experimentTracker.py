@@ -6,6 +6,12 @@ from abc import ABC, abstractmethod
 
 import neptune.new as neptune
 import neptune.new.integrations.sklearn as npt_utils
+from neptune.new.types import File
+
+# typing
+from numpy import ndarray
+from pandas import DataFrame
+from typing import Union
 
 class ExperimentTracker(ABC):
     """
@@ -15,40 +21,38 @@ class ExperimentTracker(ABC):
     @abstractmethod
     def __init__(
             self,
-            projectName: str,
-            analysisName: str,
-            tags: list,
-            valuesToTrack: dict,
-            model,
+            projectID: str,
             **kwargs
         ):
 
-        self.projectName = projectName
-        self.analysisName = analysisName
-        self.tags = tags
-        self.valuesToTrack = valuesToTrack
-        self.model = model
+        self.projectID = projectID
 
         for flag, value in kwargs.items():
             if flag == "apiToken":
                 self.apiToken = value
 
     @abstractmethod
-    def summarizeClassifier(self, model, trainingData, testingData, trainingClasses, testingClasses):
+    def start(self, modelName, model):
         """
-        Generate sklearn classifier summary.
-        """
-    
-    @abstractmethod
-    def trackValue(self, name, value):
-        """
-        Append additional columns and values to track.
+        Initialize tracker with a given model.
         """
 
     @abstractmethod
-    def stopTracker(self):
+    def summarize(self, model, trainingData, testingData, trainingClasses, testingClasses):
         """
-        Send halt signal to experiment tracker and avoid memory leaks.
+        Generate classifier summary.
+        """
+    
+    @abstractmethod
+    def logValue(self, valueGroup: str, valueMap: dict, metric = False):
+        """
+        Append values to track.
+        """
+
+    @abstractmethod
+    def stop(self):
+        """
+        Send halt signal to experiment tracker to avoid memory leaks.
         """
 
 class NeptuneExperimentTracker(ExperimentTracker):
@@ -56,37 +60,45 @@ class NeptuneExperimentTracker(ExperimentTracker):
     Interface for experiment tracking using Neptune.
     """
 
-    def __init__(self,
-        projectName: str,
-        analysisName: str,
-        tags: list,
-        valuesToTrack: dict,
-        **kwargs
-    ):
-        super().__init__(projectName, analysisName, tags, valuesToTrack, **kwargs)
+    def __init__(self, projectID: str, **kwargs):
+        super().__init__(projectID, **kwargs)
 
+    def start(self, modelName, model, analysisName):
+        self.modelName = modelName
+        self.model = model
         self.tracker = neptune.init(
-            project = self.projectName,
+            project = self.projectID,
             api_token = self.apiToken,
-            name = self.analysisName,
-            tags = self.tags,
-            capture_hardware_metrics=False
+            name = analysisName,
+            tags = [self.modelName],
+            capture_hardware_metrics = False
         )
 
-        for column, value in self.valuesToTrack:
-            self.tracker[column] = value
-
-    def summarizeClassifier(self, model, trainingData, testingData, trainingClasses, testingClasses):
+    def summarize(
+        self, trainingData: ndarray, testingData: ndarray, trainingClasses: ndarray, testingClasses: ndarray
+    ):
         self.tracker["summary"] = npt_utils.create_classifier_summary(
-            model,
+            self.model,
             trainingData,
             testingData,
             trainingClasses,
             testingClasses
         )
 
-    def trackValue(self, name, value):
-        self.tracker[name] = value
+    def logValue(self, valueGroup: str, valueMap: dict, metric = False):
+        if metric:
+            self.tracker[f"{valueGroup}"].log(valueMap)
+        else:
+            self.tracker[f"{valueGroup}"] = valueMap
 
-    def stopTracker(self):
+    def addTags(self, tags: list):
+        self.tracker["sys/tags"].add(tags)
+
+    def uploadTable(self, fileName: str, table: Union[DataFrame, str]):
+        if isinstance(table, DataFrame):
+            self.tracker[f'data/{fileName}'].upload(File.as_html(table))
+        elif isinstance(table, str):
+            self.tracker[f'data/{fileName}'].upload(table)
+
+    def stop(self):
         self.tracker.stop()

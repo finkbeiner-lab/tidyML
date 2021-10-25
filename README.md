@@ -13,7 +13,7 @@ and minimize duplication, which helps you write maintainable code.
 
 ## Environment
 
-- [Python 3.10 or greater](https://www.python.org/downloads/)
+- [Python 3.9 or greater](https://www.python.org/downloads/)
 
 ## Development quickstart
 
