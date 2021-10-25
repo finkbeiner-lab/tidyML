@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: tidyML
-Version: 0.0.2
+Version: 0.0.3
 Summary: Modularize your machine learning pipelines.
 Home-page: https://github.com/finkbeiner-lab/tidyML
 Author: Eric Mockler
@@ -13,11 +13,12 @@ Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
 Requires-Python: >=3.9
 Description-Content-Type: text/markdown
+License-File: LICENSE
 
 # tidyML
 
 Machine learning pipelines are too often built from spaghetti. This package provides utilities to consolidate logic
-and minimize duplication, which helps us write maintainable code.
+and minimize duplication, which helps you write maintainable code.
 
 ## Modules
 

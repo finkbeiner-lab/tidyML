@@ -29,7 +29,7 @@ class ExperimentTracker(ABC):
         self.valuesToTrack = valuesToTrack
         self.model = model
 
-        for flag, value in kwargs.items:
+        for flag, value in kwargs.items():
             if flag == "apiToken":
                 self.apiToken = value
 
