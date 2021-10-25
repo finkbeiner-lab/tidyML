@@ -32,15 +32,13 @@ class ExperimentTracker(ABC):
         for flag, value in kwargs.items:
             if flag == "apiToken":
                 self.apiToken = value
-            if flag == "trainingData":
-                self.trainingData = value
-            if flag == "testingData":
-                self.testingData = value
-            if flag == "trainingClasses":
-                self.trainingClasses = value
-            if flag == "testingClasses":
-                self.testingClasses = value
 
+    @abstractmethod
+    def summarizeClassifier(self, model, trainingData, testingData, trainingClasses, testingClasses):
+        """
+        Generate sklearn classifier summary.
+        """
+    
     @abstractmethod
     def trackValue(self, name, value):
         """
@@ -78,12 +76,13 @@ class NeptuneExperimentTracker(ExperimentTracker):
         for column, value in self.valuesToTrack:
             self.tracker[column] = value
 
+    def summarizeClassifier(self, model, trainingData, testingData, trainingClasses, testingClasses):
         self.tracker["summary"] = npt_utils.create_classifier_summary(
-            self.model,
-            self.trainingData,
-            self.testingData,
-            self.trainingClasses,
-            self.testingClasses
+            model,
+            trainingData,
+            testingData,
+            trainingClasses,
+            testingClasses
         )
 
     def trackValue(self, name, value):
