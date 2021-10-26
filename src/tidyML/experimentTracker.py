@@ -48,6 +48,18 @@ class ExperimentTracker(ABC):
         """
         Append values to track.
         """
+    
+    @abstractmethod
+    def addTags(self, tags: list):
+        """
+        Append tags to the current tracking run.
+        """
+
+    @abstractmethod
+    def uploadTable(self, fileName: str, table: Union[DataFrame, str]):
+        """
+        Upload a table from a CSV or Pandas dataframe.
+        """
 
     @abstractmethod
     def stop(self):
