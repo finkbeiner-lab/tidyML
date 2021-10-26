@@ -181,9 +181,8 @@ class DataMediator:
     def trainTestSplit(self, proportion: float, columnsToDrop: list = list()) -> None:
         """
         Split experimental and control data by a given proportion into training/testing sets, with 
-        classification targets. Access using class variables— training data with `trainingData`, 
-        training classes with `trainingClasses`, testing data with `testingData`, and testing classes 
-        with `testingClasses`.
+        classification targets. Access using class variables `trainingData`, `trainingClasses`, 
+        `testingData`, and `testingClasses`.
         """
         totalData = pd.concat([self.controlData, self.experimentalData])
         totalClasses = np.array([0] * len(self.controlData) + [1] * len(self.experimentalData))
