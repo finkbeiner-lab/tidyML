@@ -9,6 +9,7 @@ from pandas import DataFrame
 import numpy as np
 from sklearn.model_selection import train_test_split
 
+
 class DataMediator:
     """
     Split & balance a dataframe with shape (sample, variables) into `experimentalData`
@@ -36,18 +37,19 @@ class DataMediator:
         `verbose` (bool): Flag that determines whether DataMediator logs activity to
         STDOUT.
     """
+
     def __init__(
         self,
         dataframe: DataFrame,
         IDcolumnLabel: str,
         controlIDs: list,
         experimentalIDs: list,
-        **kwargs
+        **kwargs,
     ) -> None:
         self.dataframe = dataframe
         self.IDcolumnLabel = IDcolumnLabel
 
-        # filter samples according to filter map
+        # split experimental & control data with given IDs
         self.experimentalData = self.__splitDataFrame(experimentalIDs)
         self.controlData = self.__splitDataFrame(controlIDs)
 
@@ -72,7 +74,7 @@ class DataMediator:
                 else:
                     self.__balance(value)
             if flag == "filterMap":
-                   self.filter(value)
+                self.filter(value)
             if flag == "verbose":
                 self.verbose = value
 
@@ -81,7 +83,8 @@ class DataMediator:
         idColumnLabel: str,
         indexColumnLabel: str,
         dataframe: DataFrame,
-        transpose: bool = False) -> DataFrame:
+        transpose: bool = False,
+    ) -> DataFrame:
         """
         Static method to set the index column label of a given dataframe,
         and append the label to all IDs in the dataframe.
@@ -89,10 +92,13 @@ class DataMediator:
         IDs = dataframe[idColumnLabel].tolist()
         if transpose:
             renamedDataframeIndex = dataframe.T
-        renamedDataframeIndex = renamedDataframeIndex.reset_index().rename(columns = {'index' : indexColumnLabel})
+        renamedDataframeIndex = renamedDataframeIndex.reset_index().rename(
+            columns={"index": indexColumnLabel}
+        )
         renamedDataframeIndex.columns = [indexColumnLabel] + IDs
         formattedDataFrame = renamedDataframeIndex[
-            renamedDataframeIndex[indexColumnLabel] != idColumnLabel]
+            renamedDataframeIndex[indexColumnLabel] != idColumnLabel
+        ]
         formattedDataFrame = formattedDataFrame.reset_index(drop=True)
         return formattedDataFrame
 
@@ -116,9 +122,11 @@ class DataMediator:
             raise ValueError("Proportion must be in the range of (0, 1)")
 
         self.controlHoldout = self.controlData.sample(
-            int(len(self.controlData) * proportion))
+            int(len(self.controlData) * proportion)
+        )
         self.experimentalHoldout = self.experimentalData.sample(
-            int(len(self.experimentalData) * proportion))
+            int(len(self.experimentalData) * proportion)
+        )
 
         # ignore chained assigment warning in Pandas since we are dropping rows in-place
         pd.options.mode.chained_assignment = None
@@ -131,7 +139,8 @@ class DataMediator:
     def __balance(
         self,
         balancingMethod: str = "downsampling",
-        balancingMethodCallback: Optional[Callable] = None) -> None :
+        balancingMethodCallback: Optional[Callable] = None,
+    ) -> None:
         """
         Private method to balance control, experimental & holdout datasets, with a
         given sampling method. The default is "downsampling"; "upsampling" or "smote"
@@ -142,22 +151,26 @@ class DataMediator:
         smallSplit = min([self.experimentalData, self.controlData], key=len)
 
         if hasattr(self, "verbose"):
-            print('Unbalanced classes')
-            print(f'Minority split count: {len(largeSplit)}')
-            print(f'Majority split count: {len(smallSplit)}')
+            print("Unbalanced classes")
+            print(f"Minority split count: {len(largeSplit)}")
+            print(f"Majority split count: {len(smallSplit)}")
 
         # Balancing the Data
         # ignore chained assigment warning in Pandas since we are dropping rows in-place
         pd.options.mode.chained_assignment = None
         if balancingMethodCallback and balancingMethod == "downsampling":
             dataToDrop = balancingMethodCallback(largeSplit)
-            largeSplit.drop(dataToDrop.index.symmetric_difference(largeSplit.index), inplace=True)
+            largeSplit.drop(
+                dataToDrop.index.symmetric_difference(largeSplit.index), inplace=True
+            )
         elif balancingMethodCallback and balancingMethod == "upsampling":
             dataToAdd = balancingMethodCallback(smallSplit)
             smallSplit.merge(dataToAdd)
         elif balancingMethod == "downsampling":
             dataToDrop = largeSplit.sample(len(smallSplit))
-            largeSplit.drop(dataToDrop.index.symmetric_difference(largeSplit.index), inplace=True)
+            largeSplit.drop(
+                dataToDrop.index.symmetric_difference(largeSplit.index), inplace=True
+            )
         elif balancingMethod == "upsampling":
             dataToAdd = smallSplit.sample(len(largeSplit), replace=True)
             smallSplit.merge(dataToAdd)
@@ -180,15 +193,21 @@ class DataMediator:
 
     def trainTestSplit(self, proportion: float, columnsToDrop: list = list()) -> None:
         """
-        Split experimental and control data by a given proportion into training/testing sets, with 
-        classification targets. Access using class variables `trainingData`, `trainingClasses`, 
-        `testingData`, and `testingClasses`.
+        Split experimental and control data by a given proportion into training/testing sets, with
+        classification targets. Access using class variables `trainingData`, `trainingLabels`,
+        `testingData`, and `testingLabels`.
         """
         totalData = pd.concat([self.controlData, self.experimentalData])
-        totalClasses = np.array([0] * len(self.controlData) + [1] * len(self.experimentalData))
+        totalLabels = np.array(
+            [0] * len(self.controlData) + [1] * len(self.experimentalData)
+        )
         totalData.drop(columnsToDrop, axis=1, inplace=True)
-        self.trainingData, self.testingData, self.trainingClasses, self.testingClasses = train_test_split(
-            totalData.astype(float), totalClasses, test_size=proportion)
+        (
+            self.trainingData,
+            self.testingData,
+            self.trainingLabels,
+            self.testingLabels,
+        ) = train_test_split(totalData.astype(float), totalLabels, test_size=proportion)
 
     def filter(self, filterMap: Union[DataFrame, dict]) -> None:
         """

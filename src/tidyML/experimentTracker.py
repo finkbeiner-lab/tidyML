@@ -13,17 +13,14 @@ from numpy import ndarray
 from pandas import DataFrame
 from typing import Union
 
+
 class ExperimentTracker(ABC):
     """
     Encapsulates metadata for experiment tracking across runs.
     """
 
     @abstractmethod
-    def __init__(
-            self,
-            projectID: str,
-            **kwargs
-        ):
+    def __init__(self, projectID: str, **kwargs):
 
         self.projectID = projectID
 
@@ -38,17 +35,19 @@ class ExperimentTracker(ABC):
         """
 
     @abstractmethod
-    def summarize(self, model, trainingData, testingData, trainingClasses, testingClasses):
+    def summarize(
+        self, model, trainingData, testingData, trainingLabels, testingLabels
+    ):
         """
         Generate classifier summary.
         """
-    
+
     @abstractmethod
-    def logValue(self, valueGroup: str, valueMap: dict, metric = False):
+    def logValue(self, valueGroup: str, valueMap: dict, metric=False):
         """
         Append values to track.
         """
-    
+
     @abstractmethod
     def addTags(self, tags: list):
         """
@@ -64,8 +63,9 @@ class ExperimentTracker(ABC):
     @abstractmethod
     def stop(self):
         """
-        Send halt signal to experiment tracker to avoid memory leaks.
+        Send halt signal to experiment tracker and avoid memory leaks.
         """
+
 
 class NeptuneExperimentTracker(ExperimentTracker):
     """
@@ -79,25 +79,25 @@ class NeptuneExperimentTracker(ExperimentTracker):
         self.modelName = modelName
         self.model = model
         self.tracker = neptune.init(
-            project = self.projectID,
-            api_token = self.apiToken,
-            name = analysisName,
-            tags = [self.modelName],
-            capture_hardware_metrics = False
+            project=self.projectID,
+            api_token=self.apiToken,
+            name=analysisName,
+            tags=[self.modelName],
+            capture_hardware_metrics=False,
         )
 
     def summarize(
-        self, trainingData: ndarray, testingData: ndarray, trainingClasses: ndarray, testingClasses: ndarray
+        self,
+        trainingData: ndarray,
+        testingData: ndarray,
+        trainingLabels: ndarray,
+        testingLabels: ndarray,
     ):
         self.tracker["summary"] = npt_utils.create_classifier_summary(
-            self.model,
-            trainingData,
-            testingData,
-            trainingClasses,
-            testingClasses
+            self.model, trainingData, testingData, trainingLabels, testingLabels
         )
 
-    def logValue(self, valueGroup: str, valueMap: dict, metric = False):
+    def logValue(self, valueGroup: str, valueMap: dict, metric=False):
         if metric:
             self.tracker[f"{valueGroup}"].log(valueMap)
         else:
@@ -108,9 +108,9 @@ class NeptuneExperimentTracker(ExperimentTracker):
 
     def uploadTable(self, fileName: str, table: Union[DataFrame, str]):
         if isinstance(table, DataFrame):
-            self.tracker[f'data/{fileName}'].upload(File.as_html(table))
+            self.tracker[f"data/{fileName}"].upload(File.as_html(table))
         elif isinstance(table, str):
-            self.tracker[f'data/{fileName}'].upload(table)
+            self.tracker[f"data/{fileName}"].upload(table)
 
     def stop(self):
         self.tracker.stop()
