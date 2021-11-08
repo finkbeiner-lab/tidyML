@@ -17,37 +17,37 @@ class DataMediator:
     proportion of data to sequester from experimental & control sets, which are
     accessible via the `experimentalHoldout` and `controlHoldout` class variables.
 
-    Filtering may be done with a user-defined mapping of conditions to columns.
+    TODO: Filtering may be done with a user-defined mapping of conditions to columns.
 
     Args:
         `dataframe` (DataFrame): Data to split, balance, and take holdouts from.
-        `IDcolumnLabel` (str): Column name of IDs in the dataframe.
+        `IDlabel` (str): Column name of IDs in the dataframe.
         `controlIDs` (list[str]): List of sample IDs in the control set.
         `experimentalIDs` (list[str]): List of sample IDs in the experimental set.
 
     Kwargs:
         `holdout` (float): Proportion of data from experimental & control sets to holdout.
         `balancingMethod` (str): Sampling method used for data balancing. The default is
-        "downsampling"; "upsampling" or "smote" are additional options. The Pandas sample()
-        method is called by default on experimental and control data.
+            "downsampling"; "upsampling" or "smote" are additional options. Sampling occurs via
+            the Pandas `sample()` method, unless another callback is defined.
         `balancingMethodCallback` (Callable): A custom sampling method callback,
-        which is called instead of Pandas sample() on control, experimental & holdout
-        dataframes.
+            which is called instead of Pandas sample() on control, experimental & holdout
+            dataframes.
         `filterMap`: TODO
         `verbose` (bool): Flag that determines whether DataMediator logs activity to
-        STDOUT.
+            STDOUT.
     """
 
     def __init__(
         self,
         dataframe: DataFrame,
-        IDcolumnLabel: str,
+        IDlabel: str,
         controlIDs: list,
         experimentalIDs: list,
         **kwargs,
     ) -> None:
         self.dataframe = dataframe
-        self.IDcolumnLabel = IDcolumnLabel
+        self.IDlabel = IDlabel
 
         # split experimental & control data with given IDs
         self.experimentalData = self.__splitDataFrame(experimentalIDs)
@@ -79,28 +79,24 @@ class DataMediator:
                 self.verbose = value
 
     @staticmethod
-    def formatDataFrame(
-        idColumnLabel: str,
-        indexColumnLabel: str,
-        dataframe: DataFrame,
-        transpose: bool = False,
+    def transposeDataFrame(
+        dataframe,
+        newColumnIndex: str,
+        newRowIndex: str,
     ) -> DataFrame:
         """
-        Static method to set the index column label of a given dataframe,
-        and append the label to all IDs in the dataframe.
+        Static method to transpose a dataframe by a given column,
+        with a new row index.
         """
-        IDs = dataframe[idColumnLabel].tolist()
-        if transpose:
-            renamedDataframeIndex = dataframe.T
-        renamedDataframeIndex = renamedDataframeIndex.reset_index().rename(
-            columns={"index": indexColumnLabel}
-        )
-        renamedDataframeIndex.columns = [indexColumnLabel] + IDs
-        formattedDataFrame = renamedDataframeIndex[
-            renamedDataframeIndex[indexColumnLabel] != idColumnLabel
-        ]
-        formattedDataFrame = formattedDataFrame.reset_index(drop=True)
-        return formattedDataFrame
+        columnIDs = dataframe[newColumnIndex].tolist()
+        # drop transposed column IDs from data
+        transposed = dataframe.T.iloc[1:, :]
+
+        # set new indices
+        transposed.columns = columnIDs
+        transposed.index.name = newRowIndex
+
+        return transposed
 
     def __splitDataFrame(self, IDs: list) -> DataFrame:
         """
@@ -108,7 +104,8 @@ class DataMediator:
         dataframe attached to this instance, into experimental
         & control dataframes.
         """
-        return self.dataframe[self.dataframe[self.IDcolumnLabel].isin(IDs)]
+
+        return self.dataframe.loc[[ID for ID in IDs if ID in self.dataframe.index]]
 
     def __createHoldout(self, proportion: float) -> None:
         """
@@ -178,6 +175,14 @@ class DataMediator:
         pd.options.mode.chained_assignment = "warn"
         # TODO: implement smote
 
+    @property
+    def featureCount(self, columnStratified=True):
+        """
+        Return number of features from the input dataframe. If features are
+        stratified by row, set `columnStratified` to falsy.
+        """
+        return self.dataframe.shape[1 if columnStratified else 0]
+
     def resample(self) -> None:
         """
         Reinitialize experimental & control data; redo holdout sequestration
@@ -191,23 +196,24 @@ class DataMediator:
         if self.holdoutProportion:
             self.__createHoldout(self.holdoutProportion)
 
-    def trainTestSplit(self, proportion: float, columnsToDrop: list = list()) -> None:
+    def trainTestSplit(self, proportion: float, dropIndex: bool = True) -> None:
         """
         Split experimental and control data by a given proportion into training/testing sets, with
         classification targets. Access using class variables `trainingData`, `trainingLabels`,
         `testingData`, and `testingLabels`.
         """
-        totalData = pd.concat([self.controlData, self.experimentalData])
+        allData = pd.concat([self.controlData, self.experimentalData])
         totalLabels = np.array(
             [0] * len(self.controlData) + [1] * len(self.experimentalData)
         )
-        totalData.drop(columnsToDrop, axis=1, inplace=True)
+        if dropIndex:
+            allData.reset_index(drop=True, inplace=True)
         (
             self.trainingData,
             self.testingData,
             self.trainingLabels,
             self.testingLabels,
-        ) = train_test_split(totalData.astype(float), totalLabels, test_size=proportion)
+        ) = train_test_split(allData.astype(float), totalLabels, test_size=proportion)
 
     def filter(self, filterMap: Union[DataFrame, dict]) -> None:
         """

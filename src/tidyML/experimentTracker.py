@@ -35,9 +35,7 @@ class ExperimentTracker(ABC):
         """
 
     @abstractmethod
-    def summarize(
-        self, model, trainingData, testingData, trainingLabels, testingLabels
-    ):
+    def summarize(self, model, trainingData, validation, trainingLabels, testingLabels):
         """
         Generate classifier summary.
         """
@@ -89,12 +87,12 @@ class NeptuneExperimentTracker(ExperimentTracker):
     def summarize(
         self,
         trainingData: ndarray,
-        testingData: ndarray,
+        validation: ndarray,
         trainingLabels: ndarray,
         testingLabels: ndarray,
     ):
         self.tracker["summary"] = npt_utils.create_classifier_summary(
-            self.model, trainingData, testingData, trainingLabels, testingLabels
+            self.model, trainingData, validation, trainingLabels, testingLabels
         )
 
     def logValue(self, valueGroup: str, valueMap: dict, metric=False):
