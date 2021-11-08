@@ -5,11 +5,17 @@ and minimize duplication, which helps you write maintainable code.
 
 ## Modules
 
-- `DataMediator`
+- #### DataMediator
 
-- `ExperimentTracker`
+- #### ExperimentTracker
 
-- `HyperparameterOptimizer`
+  - `NeptuneExperimentTracker`
+
+- #### HyperparameterOptimizer
+
+  - `BayesianOptimizer`
+  - `GaussianProcessRegressor`
+  - `RegressorCollection`
 
 ## Environment
 

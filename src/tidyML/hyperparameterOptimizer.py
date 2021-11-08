@@ -33,8 +33,13 @@ import sklearn.gaussian_process.kernels as Kernel
 @dataclass
 class GaussianProcessRegressor:
     """
+<<<<<<< HEAD
     Interface for the Scikit Guassian Process regressor, used
     during hyperparameter optimization.
+=======
+    Interface for the Scikit Guassian Process regressor, used as a
+    surrogate model during Bayesian hyperparameter optimization.
+>>>>>>> 082ae64 (implement BayesianOptimizer & simplify DataMediator variable names)
     """
 
     kernels: Union[list[str], tuple[str]] = (
@@ -99,13 +104,36 @@ class RegressorCollection:
     Encapsulates base estimators implemented in scikit-learn.
     These estimators are used in regression to optimize model hyperparameters.
 
+<<<<<<< HEAD
     Default parameters can be set by passing "default" as a keyword argument.
+=======
+    Keyword arguments are passed as a dictionary for each regressor type.
+    Default parameters can be set by passing "default" instead.
+>>>>>>> 082ae64 (implement BayesianOptimizer & simplify DataMediator variable names)
     """
 
     GradiantBoostingQuantile: Union[dict, str] = None
     GaussianProcess: Union[dict, str] = None
     RandomForest: Union[dict, str] = None
     ExtraTrees: Union[dict, str] = None
+<<<<<<< HEAD
+=======
+
+    def __post_init__(self):
+        regressors = {
+            "GradiantBoostingQuantile": GradientBoostingQuantileRegressor,
+            "GaussianProcess": GaussianProcessRegressor,
+            "RandomForest": RandomForestRegressor,
+            "ExtraTrees": ExtraTreesRegressor,
+        }
+        self.selected = list()
+        for regressor in self.__dataclass_fields__:
+            kwargs = getattr(self, regressor)
+            if kwargs == "default":
+                self.selected.append(regressors[regressor])
+            elif kwargs != None:
+                self.selected.append(regressors[regressor](**kwargs))
+>>>>>>> 082ae64 (implement BayesianOptimizer & simplify DataMediator variable names)
 
     def __post_init__(self):
         regressors = {
@@ -122,7 +150,10 @@ class RegressorCollection:
             elif kwargs != None:
                 self.selected.append(regressors[regressor](**kwargs))
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 082ae64 (implement BayesianOptimizer & simplify DataMediator variable names)
 @dataclass
 class BayesianOptimizer:
     """
@@ -183,12 +214,16 @@ class BayesianOptimizer:
                 acq_optimizer_kwargs=self.acquisitionOptimizerKwargs,
                 model_queue_size=self.modelQueueSize,
             )
-            print("Starting...", end="\r")
+            if self.verbose:
+                print(
+                    f"Starting {model.__class__.__name__} hyperparameter optimization with {regressorName}...",
+                    end="\r",
+                )
             for i in range(0, self.iterations):
                 sampledPoints = optimizer.ask(
                     n_points=pointSampleCount, strategy=pointSampleStrategy
                 )
-                sampledPointsByParameter = [
+                sampledParameters = [
                     {
                         hyperparameter: point
                         for hyperparameter, point in zip(hyperparameterNames, points)
@@ -196,8 +231,7 @@ class BayesianOptimizer:
                     for points in sampledPoints
                 ]
                 optimizedParameters = Parallel(n_jobs=cpu_count() - 1)(
-                    delayed(loadedObjective)(**point)
-                    for point in sampledPointsByParameter
+                    delayed(loadedObjective)(**point) for point in sampledParameters
                 )
                 # remove points that did not converge
                 if np.isnan(optimizedParameters).any():
@@ -222,7 +256,7 @@ class BayesianOptimizer:
             }
             if self.verbose:
                 print(
-                    f"\n{model.__class__.__name__} using {bestParameters['regressor']} has best score of {bestScore}"
+                    f"\n{model.__class__.__name__} using {regressorName} has best score of {bestScore}"
                 )
             if bestParameters["score"] > bestScore:
                 bestParameters["regressor"] = regressorName

@@ -215,6 +215,23 @@ class DataMediator:
             self.testingLabels,
         ) = train_test_split(allData.astype(float), totalLabels, test_size=proportion)
 
+    def loadPredictions(self, predictedLabels: list, dataset: str = "testing"):
+        """
+        Index an array-like of numeric predictions into a dataframe. Training & testing
+        data must be split before using this method. Define which data to index by using
+        the `dataset` keyword argument.
+
+        The resulting dataframe is accessed via the `predictions` class variable.
+        """
+        self.predictions = pd.DataFrame(predictedLabels)
+        self.predictions.index = (
+            self.testingData.index if dataset == "testing" else self.trainingData.index
+        )
+        self.predictions["y_real"] = (
+            self.testingLabels if dataset == "testing" else self.trainingLabels
+        )
+        self.predictions["y_pred"] = np.argmax(predictedLabels, axis=1)
+
     def filter(self, filterMap: Union[DataFrame, dict]) -> None:
         """
         Filter samples in experimental & control dataframes using a predefined
