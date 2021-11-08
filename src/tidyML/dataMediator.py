@@ -81,14 +81,14 @@ class DataMediator:
     @staticmethod
     def transposeDataFrame(
         dataframe,
-        newColumnIndex: str,
+        columnToTranspose: str,
         newRowIndex: str,
     ) -> DataFrame:
         """
         Static method to transpose a dataframe by a given column,
         with a new row index.
         """
-        columnIDs = dataframe[newColumnIndex].tolist()
+        columnIDs = dataframe[columnToTranspose].tolist()
         # drop transposed column IDs from data
         transposed = dataframe.T.iloc[1:, :]
 
