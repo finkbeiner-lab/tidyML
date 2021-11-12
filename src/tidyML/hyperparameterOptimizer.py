@@ -77,7 +77,7 @@ class GaussianProcessRegressor:
         """
         self.selectedKernels.append(kernel)
 
-    def loadRegressor(self, currentKernel: Kernel):
+    def load(self, currentKernel: Kernel):
         """
         Initialize a new GaussianProcessRegressor with the given kernel.
         """
@@ -115,28 +115,21 @@ class RegressorCollection:
             "RandomForest": RandomForestRegressor,
             "ExtraTrees": ExtraTreesRegressor,
         }
-        self.selected = list()
+        self.selectedRegressors = list()
         for regressor in self.__dataclass_fields__:
             kwargs = getattr(self, regressor)
-            if kwargs == "default":
-                self.selected.append(regressors[regressor])
+            # enumerate GaussianProcessRegressors if selected with different kernels
+            if regressor == "GaussianProcess":
+                if kwargs == "default":
+                    gaussianRegressors = regressors[regressor]()
+                elif kwargs != None:
+                    gaussianRegressors = regressors[regressor](**kwargs)
+                for kernel in gaussianRegressors.selectedKernels:
+                    self.selectedRegressors.append(gaussianRegressors.load(kernel))
+            elif kwargs == "default":
+                self.selectedRegressors.append(regressors[regressor])
             elif kwargs != None:
-                self.selected.append(regressors[regressor](**kwargs))
-
-    def __post_init__(self):
-        regressors = {
-            "GradiantBoostingQuantile": GradientBoostingQuantileRegressor,
-            "GaussianProcess": GaussianProcessRegressor,
-            "RandomForest": RandomForestRegressor,
-            "ExtraTrees": ExtraTreesRegressor,
-        }
-        self.selected = list()
-        for regressor in self.__dataclass_fields__:
-            kwargs = getattr(self, regressor)
-            if kwargs == "default":
-                self.selected.append(regressors[regressor])
-            elif kwargs != None:
-                self.selected.append(regressors[regressor](**kwargs))
+                self.selectedRegressors.append(regressors[regressor](**kwargs))
 
 
 @dataclass
@@ -184,7 +177,7 @@ class BayesianOptimizer:
             },
         )
         hyperparameterNames = [parameter.name for parameter in hyperparameterSpaces]
-        for regressor in self.regressorCollection.selected:
+        for regressor in self.regressorCollection.selectedRegressors:
             regressorName = regressor.__class__.__name__
             optimizer = Optimizer(
                 dimensions=hyperparameterSpaces,
@@ -220,11 +213,10 @@ class BayesianOptimizer:
                 )
                 # remove points that did not converge
                 if np.isnan(optimizedParameters).any():
-                    pointIndicesToDrop = np.where(np.isnan(optimizedParameters))
-                    optimizedParameters = list(
-                        np.delete(optimizedParameters, pointIndicesToDrop)
-                    )
-                    sampledPoints = list(np.delete(sampledPoints, pointIndicesToDrop))
+                    pointIndicesToDrop = np.flatnonzero(np.isnan(optimizedParameters))
+                    for index in sorted(pointIndicesToDrop, reverse=True):
+                        del optimizedParameters[index]
+                        del sampledPoints[index]
                 optimizer.tell(sampledPoints, optimizedParameters)
                 bestScore = min(optimizer.yi)
                 if self.verbose:
