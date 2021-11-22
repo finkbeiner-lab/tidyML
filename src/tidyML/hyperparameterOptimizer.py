@@ -17,7 +17,7 @@ from skopt.learning import (
     ExtraTreesRegressor,
     RandomForestRegressor,
 )
-from sklearn.gaussian_process.kernels import (
+from skopt.learning.gaussian_process.kernels import (
     RBF,
     Matern,
     RationalQuadratic,
@@ -27,7 +27,7 @@ from sklearn.gaussian_process.kernels import (
 )
 
 # types
-import sklearn.gaussian_process.kernels as Kernel
+import skopt.learning.gaussian_process.kernels as Kernel
 
 
 @dataclass
@@ -37,11 +37,11 @@ class GaussianProcessRegressor:
     surrogate model during Bayesian hyperparameter optimization.
     """
 
-    kernels: Union[list[str], tuple[str]] = (
+    kernels: list[str] = (
         "RBF",
         "RationalQuadratic",
         "ExpSineSquared",
-        "ConstantKernel",
+        #"ConstantKernel",
         "Matern",
     )
     alpha: float = 1e-10
@@ -121,9 +121,12 @@ class RegressorCollection:
             # enumerate GaussianProcessRegressors if selected with different kernels
             if regressor == "GaussianProcess":
                 if kwargs == "default":
+                    # pass empty args to run post-init
                     gaussianRegressors = regressors[regressor]()
                 elif kwargs != None:
                     gaussianRegressors = regressors[regressor](**kwargs)
+                else:
+                    continue
                 for kernel in gaussianRegressors.selectedKernels:
                     self.selectedRegressors.append(gaussianRegressors.load(kernel))
             elif kwargs == "default":
@@ -178,7 +181,10 @@ class BayesianOptimizer:
         )
         hyperparameterNames = [parameter.name for parameter in hyperparameterSpaces]
         for regressor in self.regressorCollection.selectedRegressors:
-            regressorName = regressor.__class__.__name__
+            regressorName = regressor.__class__.__name__ + (
+                str(regressor.kernel.k2).split('(')[0] 
+                if regressor.__class__.__name__ == "GaussianProcessRegressor" else ''
+            )
             optimizer = Optimizer(
                 dimensions=hyperparameterSpaces,
                 base_estimator=regressor,
@@ -208,7 +214,7 @@ class BayesianOptimizer:
                     }
                     for points in sampledPoints
                 ]
-                optimizedParameters = Parallel(n_jobs=cpu_count() - 1)(
+                optimizedParameters = Parallel(n_jobs=cpu_count())(
                     delayed(loadedObjective)(**point) for point in sampledParameters
                 )
                 # remove points that did not converge
