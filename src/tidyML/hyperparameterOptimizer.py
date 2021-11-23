@@ -11,7 +11,6 @@ import numpy as np
 from skopt import Optimizer, Space
 
 # sci-kit
-from sklearn.utils import parallel_backend
 from skopt.learning import (
     GaussianProcessRegressor as ScikitGaussianProcessRegressor,
     GradientBoostingQuantileRegressor,
@@ -215,10 +214,9 @@ class BayesianOptimizer:
                     }
                     for points in sampledPoints
                 ]
-                with parallel_backend('threading'):
-                    optimizedParameters = Parallel()(
-                        delayed(loadedObjective)(**point) for point in sampledParameters
-                    )
+                optimizedParameters = Parallel()(
+                    delayed(loadedObjective)(**point) for point in sampledParameters
+                )
                 # remove points that did not converge
                 if np.isnan(optimizedParameters).any():
                     pointIndicesToDrop = np.flatnonzero(np.isnan(optimizedParameters))
