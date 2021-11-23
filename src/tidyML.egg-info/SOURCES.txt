@@ -1,6 +1,8 @@
+.gitignore
 LICENSE
 README.md
 pyproject.toml
+requirements.txt
 setup.cfg
 src/tidyML/__init__.py
 src/tidyML/dataMediator.py
@@ -10,3 +12,6 @@ src/tidyML.egg-info/PKG-INFO
 src/tidyML.egg-info/SOURCES.txt
 src/tidyML.egg-info/dependency_links.txt
 src/tidyML.egg-info/top_level.txt
+test/__init__.py
+test/dataMediatorTest.py
+test/hyperparameterOptimizerTest.py

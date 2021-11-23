@@ -13,7 +13,6 @@ from numpy import ndarray
 from pandas import DataFrame
 from typing import Union
 
-
 class ExperimentTracker(ABC):
     """
     Encapsulates metadata for experiment tracking across runs.
