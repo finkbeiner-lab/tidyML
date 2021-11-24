@@ -129,7 +129,8 @@ class DataMediator:
         pd.options.mode.chained_assignment = None
         # remove holdouts from experimental & control data
         self.controlData.drop(self.controlHoldout.index, inplace=True)
-        self.experimentalData.drop(self.experimentalHoldout.index, inplace=True)
+        self.experimentalData.drop(
+            self.experimentalHoldout.index, inplace=True)
         # restore chained assignment warning
         pd.options.mode.chained_assignment = "warn"
 
@@ -196,17 +197,19 @@ class DataMediator:
         if self.holdoutProportion:
             self.__createHoldout(self.holdoutProportion)
 
-    def trainTestSplit(self, proportion: float, dropIndex: bool = True) -> None:
+    def trainTestSplit(self, proportion: float, mapIndex: bool = True) -> None:
         """
         Split experimental and control data by a given proportion into training/testing sets, with
         classification targets. Access using class variables `trainingData`, `trainingLabels`,
         `testingData`, and `testingLabels`.
         """
         allData = pd.concat([self.controlData, self.experimentalData])
+
         totalLabels = np.array(
             [0] * len(self.controlData) + [1] * len(self.experimentalData)
         )
-        if dropIndex:
+        if mapIndex:
+            self.trainTestIndex = allData.index.tolist()
             allData.reset_index(drop=True, inplace=True)
         (
             self.trainingData,
@@ -224,12 +227,13 @@ class DataMediator:
         The resulting dataframe is accessed via the `predictions` class variable.
         """
         self.predictions = pd.DataFrame(predictedLabels)
-        self.predictions.index = (
-            self.testingData.index if dataset == "testing" else self.trainingData.index
-        )
-        self.predictions["y_real"] = (
+        self.predictions.index = [
+            self.trainTestIndex[i] for i in predictedLabels.index.tolist()
+        ]
+
+        self.predictions["y_real"] = [
             self.testingLabels if dataset == "testing" else self.trainingLabels
-        )
+        ]
         self.predictions["y_pred"] = np.argmax(predictedLabels, axis=1)
 
     def filter(self, filterMap: Union[DataFrame, dict]) -> None:
