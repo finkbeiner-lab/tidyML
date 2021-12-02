@@ -104,7 +104,7 @@ class NeptuneExperimentTracker(ExperimentTracker):
         self.tracker["sys/tags"].add(tags)
 
     def uploadTable(self, fileName: str, table: Union[DataFrame, str]):
-        if isinstance(table, DataFrame):
+        if isinstance(table, DataFrame) or table.__name__ == 'matplotlib.pyplot':
             self.tracker[f"data/{fileName}"].upload(File.as_html(table))
         elif isinstance(table, str):
             self.tracker[f"data/{fileName}"].upload(table)
