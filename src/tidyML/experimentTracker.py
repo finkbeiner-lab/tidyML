@@ -12,6 +12,7 @@ from neptune.new.types import File
 from numpy import ndarray
 from pandas import DataFrame
 from typing import Union
+from matplotlib.figure import Figure
 
 class ExperimentTracker(ABC):
     """
@@ -104,7 +105,7 @@ class NeptuneExperimentTracker(ExperimentTracker):
         self.tracker["sys/tags"].add(tags)
 
     def uploadTable(self, fileName: str, table: Union[DataFrame, str]):
-        if isinstance(table, DataFrame) or table.__name__ == 'matplotlib.pyplot':
+        if isinstance(table, DataFrame) or type(table) == Figure:
             self.tracker[f"data/{fileName}"].upload(File.as_html(table))
         elif isinstance(table, str):
             self.tracker[f"data/{fileName}"].upload(table)
