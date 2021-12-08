@@ -14,6 +14,7 @@ from pandas import DataFrame
 from typing import Union
 from matplotlib.figure import Figure
 
+
 class ExperimentTracker(ABC):
     """
     Encapsulates metadata for experiment tracking across runs.
@@ -53,7 +54,7 @@ class ExperimentTracker(ABC):
         """
 
     @abstractmethod
-    def uploadTable(self, fileName: str, table: Union[DataFrame, str]):
+    def uploadTable(self, fileName: str, table: Union[DataFrame, Figure, str]):
         """
         Upload a table from a CSV or Pandas dataframe.
         """
@@ -104,7 +105,7 @@ class NeptuneExperimentTracker(ExperimentTracker):
     def addTags(self, tags: list):
         self.tracker["sys/tags"].add(tags)
 
-    def uploadTable(self, fileName: str, table: Union[DataFrame, str]):
+    def uploadTable(self, fileName: str, table: Union[DataFrame, Figure, str]):
         if isinstance(table, DataFrame) or type(table) == Figure:
             self.tracker[f"data/{fileName}"].upload(File.as_html(table))
         elif isinstance(table, str):
