@@ -4,7 +4,6 @@ Hyperparameter optimization for SciKit models.
 
 from os import cpu_count
 from dataclasses import dataclass
-from typing import Callable, Iterable, Union
 from functools import partial
 from joblib import Parallel, delayed
 import numpy as np
@@ -28,6 +27,7 @@ from skopt.learning.gaussian_process.kernels import (
 
 # types
 import skopt.learning.gaussian_process.kernels as Kernel
+from typing import List, Callable, Iterable, Union
 
 
 @dataclass
@@ -37,7 +37,7 @@ class GaussianProcessRegressor:
     surrogate model during Bayesian hyperparameter optimization.
     """
 
-    kernels: list[str] = (
+    kernels: List[str] = (
         "RBF",
         "RationalQuadratic",
         "ExpSineSquared",
@@ -68,8 +68,7 @@ class GaussianProcessRegressor:
             "Matern": 1.0
             * Matern(length_scale=1.0, length_scale_bounds=(1e-1, 10.0), nu=2.5),
         }
-        self.selectedKernels = [defaultKernels[kernel]
-                                for kernel in self.kernels]
+        self.selectedKernels = [defaultKernels[kernel] for kernel in self.kernels]
 
     def addKernel(self, kernel: Kernel):
         """
@@ -129,8 +128,7 @@ class RegressorCollection:
                 else:
                     continue
                 for kernel in gaussianRegressors.selectedKernels:
-                    self.selectedRegressors.append(
-                        gaussianRegressors.load(kernel))
+                    self.selectedRegressors.append(gaussianRegressors.load(kernel))
             elif kwargs == "default":
                 self.selectedRegressors.append(regressors[regressor])
             elif kwargs != None:
@@ -172,8 +170,7 @@ class BayesianOptimizer:
         Returns a dictionary of best hyperparameters keyed by name.
         """
         self.bestParametersByRegressor = dict()
-        bestParameters = {"regressor": None,
-                          "score": float("inf"), "parameters": None}
+        bestParameters = {"regressor": None, "score": float("inf"), "parameters": None}
         loadedObjective = partial(
             objectiveToMinimize,
             **{
@@ -182,12 +179,12 @@ class BayesianOptimizer:
                 "trainingLabels": trainingLabels,
             },
         )
-        hyperparameterNames = [
-            parameter.name for parameter in hyperparameterSpaces]
+        hyperparameterNames = [parameter.name for parameter in hyperparameterSpaces]
         for regressor in self.regressorCollection.selectedRegressors:
             regressorName = regressor.__class__.__name__ + (
-                str(regressor.kernel.k2).split('(')[0]
-                if regressor.__class__.__name__ == "GaussianProcessRegressor" else ''
+                str(regressor.kernel.k2).split("(")[0]
+                if regressor.__class__.__name__ == "GaussianProcessRegressor"
+                else ""
             )
             optimizer = Optimizer(
                 dimensions=hyperparameterSpaces,
@@ -223,8 +220,7 @@ class BayesianOptimizer:
                 )
                 # remove points that did not converge
                 if np.isnan(optimizedParameters).any():
-                    pointIndicesToDrop = np.flatnonzero(
-                        np.isnan(optimizedParameters))
+                    pointIndicesToDrop = np.flatnonzero(np.isnan(optimizedParameters))
                     for index in sorted(pointIndicesToDrop, reverse=True):
                         del optimizedParameters[index]
                         del sampledPoints[index]
