@@ -107,7 +107,12 @@ class NeptuneExperimentTracker(ExperimentTracker):
 
     def uploadTable(self, fileName: str, table: Union[DataFrame, Figure, str]):
         if isinstance(table, DataFrame) or type(table) == Figure:
-            self.tracker[f"data/{fileName}"].upload(File.as_html(table))
+            try:
+                self.tracker[f"data/{fileName}"].upload(File.as_html(table))
+            except Exception:
+                if type(table) == Figure:
+                    self.tracker[f"data/{fileName}"].upload(File.as_image(table))
+                print("Continuing past exception:" + str(Exception))
         elif isinstance(table, str):
             self.tracker[f"data/{fileName}"].upload(table)
 
