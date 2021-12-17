@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 import neptune.new as neptune
 import neptune.new.integrations.sklearn as npt_utils
 from neptune.new.types import File
+import os
 
 # typing
 from numpy import ndarray
@@ -42,7 +43,7 @@ class ExperimentTracker(ABC):
         """
 
     @abstractmethod
-    def logValue(self, valueGroup: str, valueMap: dict, metric=False):
+    def logValue(self, path: str, value: dict, metric=False):
         """
         Append values to track.
         """
@@ -51,6 +52,16 @@ class ExperimentTracker(ABC):
     def addTags(self, tags: list):
         """
         Append tags to the current tracking run.
+        """
+
+    @abstractmethod
+    def getRuns(
+        self,
+        runID: Union[list, str] = None,
+        tag: Union[list, str] = None,
+    ):
+        """
+        Fetch the latest runs by ID or tag. All runs are fetched by default.
         """
 
     @abstractmethod
@@ -96,23 +107,43 @@ class NeptuneExperimentTracker(ExperimentTracker):
             self.model, trainingData, validation, trainingLabels, testingLabels
         )
 
-    def logValue(self, valueGroup: str, valueMap: dict, metric=False):
+    def logValue(self, path: str, value: dict, metric=False):
         if metric:
-            self.tracker[f"{valueGroup}"].log(valueMap)
+            self.tracker[f"{path}"].log(value)
         else:
-            self.tracker[f"{valueGroup}"] = valueMap
+            self.tracker[f"{path}"] = value
 
     def addTags(self, tags: list):
         self.tracker["sys/tags"].add(tags)
 
-    def uploadTable(self, fileName: str, table: Union[DataFrame, Figure, str]):
+    def getRuns(
+        self,
+        runID: Union[list, str] = None,
+        tag: Union[list, str] = None,
+    ):
+        project = neptune.get_project(name=self.projectID, api_token=self.apiToken)
+        self.runs = project.fetch_runs_table(id=runID, tag=tag)
+
+    def uploadTable(
+        self,
+        fileName: str,
+        table: Union[DataFrame, Figure, str],
+        fileExtension: str = None,
+    ):
         if isinstance(table, DataFrame) or type(table) == Figure:
-            try:
-                self.tracker[f"data/{fileName}"].upload(File.as_html(table))
-            except Exception:
-                if type(table) == Figure:
-                    self.tracker[f"data/{fileName}"].upload(File.as_image(table))
-                print("Continuing past exception:" + str(Exception))
+            if fileExtension == "pdf" and type(table) == Figure:
+                # write temporary PDF & upload
+                fileName = fileName + "." + fileExtension
+                table.savefig(fileName)
+                self.tracker[f"uploads/{fileName}"].upload(fileName)
+                os.remove(fileName)
+            else:
+                try:
+                    self.tracker[f"uploads/{fileName}"].upload(File.as_html(table))
+                except Exception:
+                    if type(table) == Figure:
+                        self.tracker[f"uploads/{fileName}"].upload(File.as_image(table))
+                    print("Continuing past exception:" + str(Exception))
         elif isinstance(table, str):
             self.tracker[f"data/{fileName}"].upload(table)
 

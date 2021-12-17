@@ -9,7 +9,6 @@ from pandas import DataFrame
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-
 class DataMediator:
     """
     Split & balance a dataframe with shape (sample, variables) into `experimentalData`
@@ -75,19 +74,19 @@ class DataMediator:
     def transposeDataFrame(
         dataframe,
         columnToTranspose: str,
-        newRowIndex: str,
+        columnsToDrop: slice = None,
     ) -> DataFrame:
         """
         Static method to transpose a dataframe by a given column,
         with a new row index.
         """
-        columnIDs = dataframe[columnToTranspose].tolist()
-        # drop transposed column IDs from data
-        transposed = dataframe.T.iloc[1:, :]
 
+        # drop transposed column IDs from data
+        transposed = dataframe.drop(columns=dataframe.columns[columnsToDrop]).T.iloc[1:, :]
+        columnIDs = dataframe[columnToTranspose].tolist()
+        
         # set new indices
         transposed.columns = columnIDs
-        transposed.index.name = newRowIndex
 
         return transposed
 
@@ -141,7 +140,7 @@ class DataMediator:
         smallSplit = min([self.experimentalData, self.controlData], key=len)
 
         if hasattr(self, "verbose"):
-            print("Unbalanced classes")
+            print(f"Unbalanced classes— {False if largeSplit == smallSplit else True}")
             print(f"Minority split count: {len(largeSplit)}")
             print(f"Majority split count: {len(smallSplit)}")
 
@@ -176,14 +175,14 @@ class DataMediator:
         """
         return self.dataframe.shape[1 if columnStratified else 0]
 
-    def resample(self) -> None:
+    def resample(self, keepFilters=False) -> None:
         """
         Reinitialize experimental & control data; redo holdout sequestration
         and dataset balancing.
         """
-        self.experimentalData = self.__experimentalData.copy(deep=True)
-        self.controlData = self.__controlData.copy(deep=True)
-
+        if not keepFilters:
+            self.experimentalData = self.__experimentalData.copy(deep=True)
+            self.controlData = self.__controlData.copy(deep=True)
         if self.balancingMethod:
             self.__balance(self.balancingMethod, self.balancingMethodCallback)
         if self.holdoutProportion:
@@ -217,29 +216,36 @@ class DataMediator:
             self.testingLabels,
         ) = train_test_split(allData.astype(float), totalLabels, test_size=testSize)
 
-    def loadPredictions(self, predictedLabels: list, testData: str = "testing"):
+    def loadPredictions(self, predictedLabels: list, testData: str = True):
         """
         Index an array-like of numeric predictions into a dataframe. Training & testing
         data must be split before using this method.
 
         [Input]
-            `testData`: Boolean to indicate whether predictions are obtained from training or testing. \n
+            `testData`: Boolean to indicate whether predictions are obtained from training or testing. 
+            
         [New attributes]
-            `predictions` \n
+            `predictions` 
         """
         self.predictions = pd.DataFrame(predictedLabels)
         self.predictions.index = [
-            self.trainTestIndex[i] for i in predictedLabels.index.tolist()
+            self.trainTestIndex[i] for i in (self.testingData if testData else self.trainingData).index.tolist()
         ]
 
-        self.predictions["y_real"] = [
-            self.testingLabels if testData else self.trainingLabels
-        ]
+        self.predictions["y_real"] = self.testingLabels if testData else self.trainingLabels
         self.predictions["y_pred"] = np.argmax(predictedLabels, axis=1)
 
-    def filter(self, filterMap: Union[DataFrame, dict]) -> None:
+    def filterByMetric(self, column, lowerBound=0, upperBound=float("inf")) -> None:
         """
         Filter samples in experimental & control dataframes using a predefined
         condition-column mapping.
         """
-        # check if hasattr(self, 'experimentalData' | 'controlData') for filtering
+        self.experimentalData = self.experimentalData.loc[
+            self.experimentalData[column >= lowerBound] &
+            self.experimentalData[column <= upperBound]
+        ]
+        self.controlData = self.controlData.loc[
+            self.controlData[column >= lowerBound] &
+            self.controlData[column <= upperBound]
+        ]
+        self.resample(keepFilters=True)
