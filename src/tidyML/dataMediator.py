@@ -3,7 +3,7 @@ Contains a data mediator to split, balance, and holdout experimental
 and control data for machine learning pipelines.
 """
 
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Union, List
 import pandas as pd
 from pandas import DataFrame
 import numpy as np
@@ -74,7 +74,7 @@ class DataMediator:
     def transposeDataFrame(
         dataframe,
         columnToTranspose: str,
-        columnsToDrop: slice = None,
+        columnsToDrop: Union[List[str], slice] = None,
     ) -> DataFrame:
         """
         Static method to transpose a dataframe by a given column,

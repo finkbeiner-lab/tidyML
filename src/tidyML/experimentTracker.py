@@ -12,7 +12,7 @@ import os
 # typing
 from numpy import ndarray
 from pandas import DataFrame
-from typing import Union
+from typing import Union, List
 from matplotlib.figure import Figure
 
 
@@ -49,7 +49,7 @@ class ExperimentTracker(ABC):
         """
 
     @abstractmethod
-    def addTags(self, tags: list):
+    def addTags(self, tags: List):
         """
         Append tags to the current tracking run.
         """
@@ -57,8 +57,8 @@ class ExperimentTracker(ABC):
     @abstractmethod
     def getRuns(
         self,
-        runID: Union[list, str] = None,
-        tag: Union[list, str] = None,
+        runID: Union[List, str] = None,
+        tag: Union[List, str] = None,
     ):
         """
         Fetch the latest runs by ID or tag. All runs are fetched by default.
@@ -113,13 +113,13 @@ class NeptuneExperimentTracker(ExperimentTracker):
         else:
             self.tracker[f"{path}"] = value
 
-    def addTags(self, tags: list):
+    def addTags(self, tags: List):
         self.tracker["sys/tags"].add(tags)
 
     def getRuns(
         self,
-        runID: Union[list, str] = None,
-        tag: Union[list, str] = None,
+        runID: Union[List, str] = None,
+        tag: Union[List, str] = None,
     ):
         project = neptune.get_project(name=self.projectID, api_token=self.apiToken)
         self.runs = project.fetch_runs_table(id=runID, tag=tag)
