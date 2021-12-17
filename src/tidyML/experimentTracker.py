@@ -107,7 +107,7 @@ class NeptuneExperimentTracker(ExperimentTracker):
             self.model, trainingData, validation, trainingLabels, testingLabels
         )
 
-    def logValue(self, path: str, value: dict, metric=False):
+    def logValue(self, path: str, value: Union[float, int, dict], metric=False):
         if metric:
             self.tracker[f"{path}"].log(value)
         else:

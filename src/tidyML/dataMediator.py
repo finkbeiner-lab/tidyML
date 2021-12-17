@@ -82,13 +82,24 @@ class DataMediator:
         """
 
         # drop transposed column IDs from data
-        transposed = dataframe.drop(columns=dataframe.columns[columnsToDrop]).T.iloc[1:, :]
+        transposed = dataframe.drop(columns=(dataframe.columns[columnsToDrop] if type(columnsToDrop) == slice else columnsToDrop)).T.iloc[1:, :]
         columnIDs = dataframe[columnToTranspose].tolist()
         
         # set new indices
         transposed.columns = columnIDs
 
         return transposed
+
+    @staticmethod
+    def filterByMetric(dataframe, column, lowerBound=0, upperBound=float("inf")) -> None:
+        """
+        Filter samples in experimental & control dataframes using a predefined
+        condition-column mapping.
+        """
+        return dataframe.loc[
+            (dataframe[column] >= lowerBound) &
+            (dataframe[column] <= upperBound)
+        ]
 
     def __splitDataFrame(self, IDs: list) -> DataFrame:
         """
@@ -234,18 +245,3 @@ class DataMediator:
 
         self.predictions["y_real"] = self.testingLabels if testData else self.trainingLabels
         self.predictions["y_pred"] = np.argmax(predictedLabels, axis=1)
-
-    def filterByMetric(self, column, lowerBound=0, upperBound=float("inf")) -> None:
-        """
-        Filter samples in experimental & control dataframes using a predefined
-        condition-column mapping.
-        """
-        self.experimentalData = self.experimentalData.loc[
-            self.experimentalData[column >= lowerBound] &
-            self.experimentalData[column <= upperBound]
-        ]
-        self.controlData = self.controlData.loc[
-            self.controlData[column >= lowerBound] &
-            self.controlData[column <= upperBound]
-        ]
-        self.resample(keepFilters=True)
