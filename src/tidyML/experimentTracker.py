@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 import neptune.new as neptune
 import neptune.new.integrations.sklearn as npt_utils
 from neptune.new.types import File
-import os
+from io import BytesIO
 
 # typing
 from numpy import ndarray
@@ -126,26 +126,28 @@ class NeptuneExperimentTracker(ExperimentTracker):
 
     def uploadTable(
         self,
+        path: str,
         fileName: str,
         table: Union[DataFrame, Figure, str],
         fileExtension: str = None,
     ):
         if isinstance(table, DataFrame) or type(table) == Figure:
-            if fileExtension == "pdf" and type(table) == Figure:
-                # write temporary PDF & upload
-                fileName = fileName + "." + fileExtension
-                table.savefig(fileName)
-                self.tracker[f"uploads/{fileName}"].upload(fileName)
-                os.remove(fileName)
+            if fileExtension and type(table) == Figure:
+                fileHandle = BytesIO()
+                table.savefig(fileHandle, format=fileExtension)
+                self.tracker[f"{path}/{fileName} preview"].upload(File.as_image(table))
+                self.tracker[f"{path}/{fileName}"].upload(
+                    File.from_stream(fileHandle, extension=fileExtension)
+                )
             else:
                 try:
-                    self.tracker[f"uploads/{fileName}"].upload(File.as_html(table))
+                    self.tracker[f"{path}/{fileName}"].upload(File.as_html(table))
                 except Exception:
                     if type(table) == Figure:
-                        self.tracker[f"uploads/{fileName}"].upload(File.as_image(table))
+                        self.tracker[f"{path}/{fileName}"].upload(File.as_image(table))
                     print("Continuing past exception:" + str(Exception))
         elif isinstance(table, str):
-            self.tracker[f"data/{fileName}"].upload(table)
+            self.tracker[f"{path}/{fileName}"].upload(table)
 
     def stop(self):
         self.tracker.stop()
