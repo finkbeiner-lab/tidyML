@@ -9,6 +9,7 @@ from pandas import DataFrame
 import numpy as np
 from sklearn.model_selection import train_test_split
 
+
 class DataMediator:
     """
     Split & balance a dataframe with shape (sample, variables) into `experimentalData`
@@ -82,24 +83,59 @@ class DataMediator:
         """
 
         # drop transposed column IDs from data
-        transposed = dataframe.drop(columns=(dataframe.columns[columnsToDrop] if type(columnsToDrop) == slice else columnsToDrop)).T.iloc[1:, :]
+        transposed = dataframe.drop(
+            columns=(
+                dataframe.columns[columnsToDrop]
+                if type(columnsToDrop) == slice
+                else columnsToDrop
+            )
+        ).T.iloc[1:, :]
         columnIDs = dataframe[columnToTranspose].tolist()
-        
+
         # set new indices
         transposed.columns = columnIDs
 
         return transposed
 
     @staticmethod
-    def filterByMetric(dataframe, column, lowerBound=0, upperBound=float("inf")) -> None:
+    def filter(
+        dataframe,
+        column,
+        lowerBound: Union[int, float] = None,
+        upperBound: Union[int, float] = None,
+        proportion: float = None,
+        metric: bool = True,
+    ) -> DataFrame:
         """
-        Filter samples in experimental & control dataframes using a predefined
-        condition-column mapping.
+        Filter rows of a given dataframe by column and condition. Numerical values may be taken by upper
+        and lower bounds, or by proportion and a single bounding criterion.
         """
-        return dataframe.loc[
-            (dataframe[column] >= lowerBound) &
-            (dataframe[column] <= upperBound)
-        ]
+        if metric:
+            if upperBound and lowerBound:
+                return dataframe.loc[
+                    (dataframe[column] >= lowerBound)
+                    & (dataframe[column] <= upperBound)
+                ]
+            elif proportion and (upperBound or lowerBound):
+                return (
+                    dataframe.sort_values(
+                        by=column,
+                        axis=0,
+                        ascending=True if lowerBound else False,
+                    )
+                    .iloc[: -int(len(dataframe) * proportion)]
+                    .sort_index()
+                )
+
+    @staticmethod
+    def removeNullColumns(dataframe) -> DataFrame:
+        """
+        Drop columns with all zero, NaN or null values.
+        """
+        # check if any truthy values exist per column
+        nullColumnView = dataframe.any()
+
+        return dataframe.loc[:, nullColumnView]
 
     def __splitDataFrame(self, IDs: list) -> DataFrame:
         """
@@ -233,15 +269,20 @@ class DataMediator:
         data must be split before using this method.
 
         [Input]
-            `testData`: Boolean to indicate whether predictions are obtained from training or testing. 
-            
+            `testData`: Boolean to indicate whether predictions are obtained from training or testing.
+
         [New attributes]
-            `predictions` 
+            `predictions`
         """
         self.predictions = pd.DataFrame(predictedLabels)
         self.predictions.index = [
-            self.trainTestIndex[i] for i in (self.testingData if testData else self.trainingData).index.tolist()
+            self.trainTestIndex[i]
+            for i in (
+                self.testingData if testData else self.trainingData
+            ).index.tolist()
         ]
 
-        self.predictions["y_real"] = self.testingLabels if testData else self.trainingLabels
+        self.predictions["y_real"] = (
+            self.testingLabels if testData else self.trainingLabels
+        )
         self.predictions["y_pred"] = np.argmax(predictedLabels, axis=1)
