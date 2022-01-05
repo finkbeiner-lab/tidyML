@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: tidyML
-Version: 0.0.5
+Version: 0.2.0
 Summary: Modularize your machine learning pipelines.
 Home-page: https://github.com/finkbeiner-lab/tidyML
 Author: Eric Mockler

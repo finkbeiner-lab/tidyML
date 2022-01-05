@@ -9,4 +9,7 @@ from .model.hyperparameterOptimizer import (
     RegressorCollection,
     BayesianOptimizer,
 )
-from .model.experimentTracker import NeptuneExperimentTracker
+from .model.experimentTracker import (
+    NeptuneExperimentTracker,
+    WandbExperimentTracker,
+)

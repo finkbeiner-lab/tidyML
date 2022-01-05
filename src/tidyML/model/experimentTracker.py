@@ -4,6 +4,8 @@ Experiment trackers for machine learning pipelines.
 
 from abc import ABC, abstractmethod
 
+from numpy.lib.arraysetops import isin
+
 import neptune.new as neptune
 import neptune.new.integrations.sklearn as npt_utils
 from neptune.new.types import File
@@ -146,11 +148,12 @@ class WandbExperimentTracker(ExperimentTracker):
     def __init__(self, projectID: str, entityID: str, **kwargs):
         super().__init__(projectID, entityID, **kwargs)
 
-    def start(self):
+    def start(self, model):
         self.tracker = wandb.init(
             project=self.projectID, entity=self.entityID, reinit=True
         )
         self.api = wandb.Api(self.entityID + "/" + self.projectID)
+        self.tracker.watch(model)
 
     def summarize(
         self,
@@ -180,15 +183,17 @@ class WandbExperimentTracker(ExperimentTracker):
         )
 
     def log(self, valueMap: dict):
-        # TODO: parse values with WandB data types here
-        self.tracker.log(valueMap)
+        for i, (key, value) in valueMap.items():
+            # TODO: parse values with WandB data types here
+            if isinstance(value, Union[float, int]):
+                self.tracker.log(
+                    {key: value}, commit=(False if i + 1 < len(valueMap) else True)
+                )
 
     def addTags(self, tags: List):
         self.tracker.tags.append(tags)
 
-    def getRuns(
-        self
-    ):
+    def getRuns(self):
         self.runs = self.api.runs(self.entityID + "/" + self.projectID)
 
     def stop(self):
