@@ -3,13 +3,13 @@ Exported classes for TidyML
 """
 
 # Libraries
-from .data.dataMediator import DataMediator
-from .model.hyperparameterOptimizer import (
+from .dataMediator import DataMediator
+from .hyperparameterOptimizer import (
     GaussianProcessRegressor,
     RegressorCollection,
     BayesianOptimizer,
 )
-from .model.experimentTracker import (
+from .experimentTracker import (
     NeptuneExperimentTracker,
     WandbExperimentTracker,
 )
