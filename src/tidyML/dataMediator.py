@@ -237,8 +237,8 @@ class DataMediator:
 
     def trainTestSplit(self, testSize: float) -> None:
         """
-        Split experimental and control data by a given testSize into training/testing sets, with
-        classification targets.
+        Split control (class 0) and experimental data (class 1) by a given testSize into training/testing sets, with
+        classification targets. 
 
         [Input]
             `testSize`: proportion of data to split for testing, between 0 and 1 \n
@@ -263,7 +263,7 @@ class DataMediator:
         ) = train_test_split(allData.astype(float), totalLabels, test_size=testSize)
         
 
-    def loadPredictions(self, predictedLabels: list, testData: bool = True):
+    def loadPredictions(self, probabilities: list, testData: bool = True):
         """
         Index an array-like of numeric predictions into a dataframe. Training & testing
         data must be split before using this method.
@@ -274,9 +274,8 @@ class DataMediator:
         [New attributes]
             `predictions`
         """
-        self.predictions = pd.DataFrame(predictedLabels)
-
-        self.predictions["y_real"] = (
-            self.testingLabels if testData else self.trainingLabels
-        )
-        self.predictions["y_pred"] = np.argmax(predictedLabels, axis=1)
+        self.predictions = pd.DataFrame({
+            "y_real": self.testingLabels if testData else self.trainingLabels,
+            "y_pred": np.argmax(probabilities, axis=1),
+            "y_probas": list(probabilities)
+        })
