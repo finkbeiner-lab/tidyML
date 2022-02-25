@@ -3,7 +3,6 @@ Experiment trackers for machine learning pipelines.
 """
 
 from abc import ABC, abstractmethod
-from functools import singledispatchmethod
 
 from numpy.lib.arraysetops import isin
 
@@ -11,13 +10,13 @@ import neptune.new as neptune
 import neptune.new.integrations.sklearn as npt_utils
 from neptune.new.types import File
 import wandb
-from io import BytesIO
-
+from io import StringIO
 # typing
 from numpy import ndarray
 from pandas import DataFrame
 from typing import Union, List
 from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
 
 # TODO: implementation-specific documentation
 
@@ -150,13 +149,13 @@ class WandbExperimentTracker(ExperimentTracker):
     """
     def __init__(self, projectID: str, entityID: str, **kwargs):
         super().__init__(projectID, entityID, **kwargs)
+        self.api = wandb.Api()
     
     def start(self, model, type="sklearn"):
         wandb.finish() # clear any hanging runs
         self.tracker = wandb.init(
             project=self.projectID, entity=self.entityID, reinit=True
         )
-        self.api = wandb.Api()
         if type != "sklearn":
             self.tracker.watch(model)
         self.tracker.name = model.__class__.__name__
@@ -191,22 +190,24 @@ class WandbExperimentTracker(ExperimentTracker):
             )
     
     def log(self, path: str, valueMap: dict, step: int = None):
-        
-        def add(path, key, value, step):
-            self.tracker.log(
-                    {path: 
-                        {key: value}
-                }, step=step)
-            
+        runningLog = dict()
         for (key, value) in valueMap.items():
             if isinstance(value, Figure):
-                add(path, key, wandb.Image(value), step)
+                value.tight_layout()
+                svgHandle = StringIO()
+                value.savefig(svgHandle, format="svg", bbox_inches="tight")
+                runningLog[key] = wandb.Html(svgHandle)
+                runningLog[key+" preview"] = wandb.Image(value)
             elif isinstance(value, DataFrame):
-                add(path, key, wandb.Table(dataframe=value), step)
+                runningLog[key]= wandb.Table(dataframe=value)
             else:
-                add(path, key, value, step)
+                runningLog[key] = value
                 
-    
+        self.tracker.log(
+            {path: runningLog}, 
+            step=step
+        )
+                
     def addTags(self, tags: List):
         self.tracker.tags.append(tags)
     
