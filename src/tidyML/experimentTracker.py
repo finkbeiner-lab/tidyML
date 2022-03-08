@@ -199,10 +199,9 @@ class WandbExperimentTracker(ExperimentTracker):
                 runningLog[key] = wandb.Html(svgHandle)
                 runningLog[key+" preview"] = wandb.Image(value)
             elif isinstance(value, DataFrame):
-                runningLog[key]= wandb.Table(dataframe=value)
+                runningLog[key]= wandb.Table(dataframe=value.reset_index())
             else:
                 runningLog[key] = value
-                
         self.tracker.log(
             {path: runningLog}, 
             step=step
