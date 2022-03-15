@@ -1,22 +1,20 @@
 """
 Experiment trackers for machine learning pipelines.
 """
-
+import os
 from abc import ABC, abstractmethod
-
-from numpy.lib.arraysetops import isin
 
 import neptune.new as neptune
 import neptune.new.integrations.sklearn as npt_utils
 from neptune.new.types import File
 import wandb
-from io import StringIO
+from io import BytesIO, StringIO
+
 # typing
 from numpy import ndarray
 from pandas import DataFrame
 from typing import Union, List
 from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
 
 # TODO: implementation-specific documentation
 
@@ -32,10 +30,6 @@ class ExperimentTracker(ABC):
         self.entityID = entityID
         self.projectID = projectID
         self.analysisName = analysisName
-
-        for flag, value in kwargs.items():
-            if flag == "apiToken":
-                self.apiToken = value
 
     def start(self, **kwargs):
         """
@@ -75,7 +69,9 @@ class NeptuneExperimentTracker(ExperimentTracker):
 
     def __init__(self, projectID: str, entityID: str, analysisName: str, **kwargs):
         super().__init__(projectID, entityID, analysisName, **kwargs)
-        
+
+        self.apiToken = kwargs["apiToken"]
+
     def start(self, model):
         self.model = model
         self.tracker = neptune.init(
@@ -85,7 +81,7 @@ class NeptuneExperimentTracker(ExperimentTracker):
             tags=[self.model.__class__.__name__],
             capture_hardware_metrics=False,
         )
-        
+
     def summarize(
         self,
         model,
@@ -93,18 +89,18 @@ class NeptuneExperimentTracker(ExperimentTracker):
         testingData: ndarray,
         trainingLabels: ndarray,
         testingLabels: ndarray,
-        **kwargs # TODO: implement multimethods to emulate function overloading
+        **kwargs,  # TODO: implement multimethods to emulate function overloading
     ):
         self.tracker["summary"] = npt_utils.create_classifier_summary(
             model, trainingData, testingData, trainingLabels, testingLabels
         )
-            
+
     def log(
         self,
         path: str,
         value: Union[float, int, dict, str, Figure, DataFrame],
         metric: bool = False,
-        **kwargs
+        **kwargs,
     ):
         if metric:
             self.tracker[f"{path}"].log(value)
@@ -127,10 +123,10 @@ class NeptuneExperimentTracker(ExperimentTracker):
             self.tracker[f"{path}"].upload(value)
         else:
             self.tracker[f"{path}"] = value
-    
+
     def addTags(self, tags: List):
         self.tracker["sys/tags"].add(tags)
-    
+
     def getRuns(
         self,
         runID: Union[List, str] = None,
@@ -138,7 +134,7 @@ class NeptuneExperimentTracker(ExperimentTracker):
     ):
         project = neptune.get_project(name=self.projectID, api_token=self.apiToken)
         self.runs = project.fetch_runs_table(id=runID, tag=tag)
-    
+
     def stop(self):
         self.tracker.stop()
 
@@ -147,19 +143,28 @@ class WandbExperimentTracker(ExperimentTracker):
     """
     Interface for experiment tracking using Weights & Biases.
     """
+
     def __init__(self, projectID: str, entityID: str, **kwargs):
         super().__init__(projectID, entityID, **kwargs)
+        
+        if kwargs["threaded"]:
+            self.threaded = True
+            os.environ["WANDB_START_METHOD"] = "thread"
         self.api = wandb.Api()
-    
+
     def start(self, model, type="sklearn"):
-        wandb.finish() # clear any hanging runs
         self.tracker = wandb.init(
-            project=self.projectID, entity=self.entityID, reinit=True
+            project=self.projectID,
+            entity=self.entityID,
+            reinit=True,
+            settings=wandb.Settings(
+                start_method=("thread" if self.threaded else "fork")
+            ),
         )
         if type != "sklearn":
             self.tracker.watch(model)
         self.tracker.name = model.__class__.__name__
-    
+
     def summarize(
         self,
         model,
@@ -172,7 +177,7 @@ class WandbExperimentTracker(ExperimentTracker):
         testProbabilities: ndarray,
         classLabels: List[str] = None,
         featureLabels: List[str] = None,
-        isSklearn: bool = True 
+        isSklearn: bool = True,
     ):
         self.tracker.config.update(hyperparameters)
         if isSklearn:
@@ -188,7 +193,7 @@ class WandbExperimentTracker(ExperimentTracker):
                 model_name=model.__class__.__name__,
                 feature_names=featureLabels,
             )
-    
+
     def log(self, path: str, valueMap: dict, step: int = None):
         runningLog = dict()
         for (key, value) in valueMap.items():
@@ -197,21 +202,18 @@ class WandbExperimentTracker(ExperimentTracker):
                 svgHandle = StringIO()
                 value.savefig(svgHandle, format="svg", bbox_inches="tight")
                 runningLog[key] = wandb.Html(svgHandle)
-                runningLog[key+" preview"] = wandb.Image(value)
+                runningLog[key + " preview"] = wandb.Image(value)
             elif isinstance(value, DataFrame):
-                runningLog[key]= wandb.Table(dataframe=value.reset_index())
+                runningLog[key] = wandb.Table(dataframe=value.reset_index())
             else:
                 runningLog[key] = value
-        self.tracker.log(
-            {path: runningLog}, 
-            step=step
-        )
-                
+        self.tracker.log({path: runningLog}, step=step)
+
     def addTags(self, tags: List):
         self.tracker.tags.append(tags)
-    
+
     def getRuns(self):
         self.runs = self.api.runs(self.entityID + "/" + self.projectID)
-    
+
     def stop(self):
         self.tracker.finish()
