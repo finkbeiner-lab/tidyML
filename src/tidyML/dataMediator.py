@@ -22,6 +22,7 @@ class DataMediator:
         `IDlabel` (str): Column name of IDs in the dataframe. \n
         `controlIDs` (list[str]): List of sample IDs in the control set. \n
         `experimentalIDs` (list[str]): List of sample IDs in the experimental set. \n
+        `randomSeed` (int): Seed number to replicate psuedorandom sampling.
 
     [Optional]
         `holdout` (float): Proportion of data from experimental & control sets to holdout. Creates `experimentalHoldout` and `controlHoldout` class variables. \n
@@ -37,10 +38,12 @@ class DataMediator:
         IDlabel: str,
         controlIDs: list,
         experimentalIDs: list,
+        randomSeed: int,
         **kwargs,
     ) -> None:
         self.dataframe = dataframe
         self.IDlabel = IDlabel
+        self.randomSeed = randomSeed
 
         # split experimental & control data with given IDs
         self.experimentalData = self.__splitDataFrame(experimentalIDs)
@@ -49,6 +52,8 @@ class DataMediator:
         # record initial state of dataframes
         self.__experimentalData = self.experimentalData.copy(deep=True)
         self.__controlData = self.controlData.copy(deep=True)
+        self.originalExperimentalIDs = self.__experimentalData.index.tolist()
+        self.originalControlIDs = self.__controlData.index.tolist()
 
         # set flags
         # take holdouts before any data balancing
@@ -158,10 +163,10 @@ class DataMediator:
             raise ValueError("Proportion must be in the range of (0, 1)")
 
         self.controlHoldout = self.controlData.sample(
-            int(len(self.controlData) * testSize)
+            int(len(self.controlData) * testSize), random_state=self.randomSeed
         )
         self.experimentalHoldout = self.experimentalData.sample(
-            int(len(self.experimentalData) * testSize)
+            int(len(self.experimentalData) * testSize), random_state=self.randomSeed
         )
 
         # ignore chained assigment warning in Pandas since we are dropping rows in-place
@@ -203,12 +208,16 @@ class DataMediator:
             dataToAdd = balancingMethodCallback(smallSplit)
             smallSplit.merge(dataToAdd)
         elif balancingMethod == "downsampling":
-            dataToDrop = largeSplit.sample(len(smallSplit))
+            dataToDrop = largeSplit.sample(
+                len(smallSplit), random_state=self.randomSeed
+            )
             largeSplit.drop(
                 dataToDrop.index.symmetric_difference(largeSplit.index), inplace=True
             )
         elif balancingMethod == "upsampling":
-            dataToAdd = smallSplit.sample(len(largeSplit), replace=True)
+            dataToAdd = smallSplit.sample(
+                len(largeSplit), replace=True, random_state=self.randomSeed
+            )
             smallSplit.merge(dataToAdd)
         # restore chained assignment warning
         pd.options.mode.chained_assignment = "warn"
@@ -220,7 +229,28 @@ class DataMediator:
         Return number of features from the input dataframe. If features are
         stratified by row, set `columnStratified` to falsy.
         """
-        return self.dataframe.shape[1 if columnStratified else 0]
+        if hasattr(self, "trainingData") and hasattr(self, "testingData"):
+            trainingShape = self.trainingData.shape[
+                1 if columnStratified else 0
+            ]
+            testingShape = self.testingData.shape[1 if columnStratified else 0]
+            return (
+                testingShape
+                if testingShape == trainingShape
+                else "unmatched feature count between training & testing!"
+            )
+        elif hasattr(self, "experimentalData") and hasattr(self, "controlData"):
+            experimentalShape = self.experimentalData.shape[
+                1 if columnStratified else 0
+            ]
+            controlShape = self.controlData.shape[1 if columnStratified else 0]
+            return (
+                controlShape
+                if controlShape == experimentalShape
+                else "unmatched feature count between cases & controls!"
+            )
+        else:
+            return self.dataframe.shape[1 if columnStratified else 0]
 
     def resample(self, keepFilters=False) -> None:
         """
@@ -235,13 +265,14 @@ class DataMediator:
         if self.holdoutProportion:
             self.__createHoldout(self.holdoutProportion)
 
-    def trainTestSplit(self, testSize: float) -> None:
+    def trainTestSplit(self, testSize: float, stratifyByClass=True) -> None:
         """
         Split control (class 0) and experimental data (class 1) by a given testSize into training/testing sets, with
-        classification targets. 
+        classification targets.
 
         [Input]
             `testSize`: proportion of data to split for testing, between 0 and 1 \n
+            `stratify`: stratify class proportions when splitting \n
         [New attributes]
             `trainingData` \n
             `trainingLabels` \n
@@ -260,8 +291,13 @@ class DataMediator:
             self.testingData,
             self.trainingLabels,
             self.testingLabels,
-        ) = train_test_split(allData.astype(float), totalLabels, test_size=testSize)
-        
+        ) = train_test_split(
+            allData.astype(float),
+            totalLabels,
+            test_size=testSize,
+            stratify=totalLabels if stratifyByClass else None,
+            random_state=self.randomSeed,
+        )
 
     def loadPredictions(self, probabilities: list, testData: bool = True):
         """
@@ -274,8 +310,10 @@ class DataMediator:
         [New attributes]
             `predictions`
         """
-        self.predictions = pd.DataFrame({
-            "y_real": self.testingLabels if testData else self.trainingLabels,
-            "y_pred": np.argmax(probabilities, axis=1),
-            "y_probas": list(probabilities)
-        })
+        self.predictions = pd.DataFrame(
+            {
+                "y_real": self.testingLabels if testData else self.trainingLabels,
+                "y_pred": np.argmax(probabilities, axis=1),
+                "y_probas": list(probabilities),
+            }
+        )

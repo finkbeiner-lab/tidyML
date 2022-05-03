@@ -1,6 +1,7 @@
 """
 Experiment trackers for machine learning pipelines.
 """
+from distutils import extension
 import os
 from abc import ABC, abstractmethod
 
@@ -9,6 +10,9 @@ import neptune.new.integrations.sklearn as npt_utils
 from neptune.new.types import File
 import wandb
 from io import BytesIO, StringIO
+from base64 import b85encode
+from pickle import dumps
+import pandas as pd
 
 # typing
 from numpy import ndarray
@@ -73,14 +77,14 @@ class NeptuneExperimentTracker(ExperimentTracker):
         self.apiToken = kwargs["apiToken"]
 
     def start(self, model):
-        self.model = model
         self.tracker = neptune.init(
-            project=self.project_id + "/" + self.entityID,
+            project=self.entityID + "/" + self.projectID,
             api_token=self.apiToken,
             name=self.analysisName,
-            tags=[self.model.__class__.__name__],
             capture_hardware_metrics=False,
         )
+        self.addTags([model.__class__.__name__])
+        self.model = model
 
     def summarize(
         self,
@@ -89,7 +93,7 @@ class NeptuneExperimentTracker(ExperimentTracker):
         testingData: ndarray,
         trainingLabels: ndarray,
         testingLabels: ndarray,
-        **kwargs,  # TODO: implement multimethods to emulate function overloading
+        **kwargs,
     ):
         self.tracker["summary"] = npt_utils.create_classifier_summary(
             model, trainingData, testingData, trainingLabels, testingLabels
@@ -98,31 +102,33 @@ class NeptuneExperimentTracker(ExperimentTracker):
     def log(
         self,
         path: str,
-        value: Union[float, int, dict, str, Figure, DataFrame],
-        metric: bool = False,
+        valueMap: dict,
         **kwargs,
     ):
-        if metric:
-            self.tracker[f"{path}"].log(value)
-        elif isinstance(value, DataFrame) or type(value) == Figure:
-            if type(value) == Figure:
+        for (key, value) in valueMap.items():
+            if isinstance(value, Figure):
                 fileHandle = BytesIO()
                 value.savefig(fileHandle, format="svg")
-                self.tracker[f"{path} preview"].upload(File.as_image(value))
-                self.tracker[f"{path}"].upload(
+                self.tracker[f"{path}/{key}"].upload(
                     File.from_stream(fileHandle, extension="svg")
                 )
+                self.tracker[f"{path}/{key} preview"].upload(File.as_image(value))
+            elif isinstance(value, DataFrame):
+                tableStream = BytesIO()
+                value.to_csv(tableStream, header=True, index=True)
+                self.tracker[f"{path}/{key}"].upload(
+                    File.from_stream(tableStream, extension="csv")
+                )
+            elif "model" in key:
+                self.tracker[f"{path}/{key}"].upload(
+                    File.from_stream(BytesIO(value), extension="pkl")
+                )
+            elif isinstance(value, bytes):
+                self.tracker[f"{path}/{key}"].upload(
+                    File.from_stream(BytesIO(value), extension="csv")
+                )
             else:
-                try:
-                    self.tracker[f"{path}"].upload(File.as_html(value))
-                except Exception:
-                    if type(value) == Figure:
-                        self.tracker[f"{path}"].upload(File.as_image(value))
-                    print("Continuing past exception:" + str(Exception))
-        elif isinstance(value, str):
-            self.tracker[f"{path}"].upload(value)
-        else:
-            self.tracker[f"{path}"] = value
+                self.tracker[f"{path}/{key}"] = value
 
     def addTags(self, tags: List):
         self.tracker["sys/tags"].add(tags)
@@ -139,6 +145,9 @@ class NeptuneExperimentTracker(ExperimentTracker):
         self.tracker.stop()
 
 
+os.environ["WANDB_START_METHOD"] = "thread"
+
+
 class WandbExperimentTracker(ExperimentTracker):
     """
     Interface for experiment tracking using Weights & Biases.
@@ -146,10 +155,9 @@ class WandbExperimentTracker(ExperimentTracker):
 
     def __init__(self, projectID: str, entityID: str, **kwargs):
         super().__init__(projectID, entityID, **kwargs)
-        
+
         if kwargs["threaded"]:
             self.threaded = True
-            os.environ["WANDB_START_METHOD"] = "thread"
         self.api = wandb.Api()
 
     def start(self, model, type="sklearn"):
