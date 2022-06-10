@@ -4,6 +4,7 @@ __pycache__/
 
 # Editor
 .vscode/
+.idea/
 
 # Builds
 dist/

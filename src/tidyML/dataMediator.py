@@ -12,20 +12,21 @@ from sklearn.model_selection import train_test_split
 
 class DataMediator:
     """
-    Split & balance a dataframe with shape (sample, variables) into `experimentalData`
-    and `controlData` class variables.
+    Split & balance a dataframe with shape (sample, variables) into `experimental`
+    and `control` class variables.
 
     TODO: Filtering may be done with a user-defined mapping of conditions to columns.
 
     [Args]
         `dataframe` (DataFrame): Data to split, balance, and take holdout \n
+        `testProportion` (float): Percentage of data from experimental & control sets to holdout. \n
         `IDlabel` (str): Column name of IDs in the dataframe. \n
         `controlIDs` (list[str]): List of sample IDs in the control set. \n
         `experimentalIDs` (list[str]): List of sample IDs in the experimental set. \n
         `randomSeed` (int): Seed number to replicate psuedorandom sampling.
 
     [Optional]
-        `holdout` (float): Proportion of data from experimental & control sets to holdout. Creates `experimentalHoldout` and `controlHoldout` class variables. \n
+        `holdoutProportion` (float): Percentage of data from experimental & control sets to holdout. \n
         `balancingMethod` (str): Sampling method used for data balancing. The default is "downsampling"; "upsampling" or "smote" are additional options. Sampling occurs via the Pandas `sample()` method, unless another callback is defined. \n
         `balancingMethodCallback` (Callable): A custom sampling method callback, which is called instead of Pandas sample() on control, experimental & holdout dataframes. \n
         `filterMap`: TODO \n
@@ -35,6 +36,7 @@ class DataMediator:
     def __init__(
         self,
         dataframe: DataFrame,
+        testProportion: float,
         IDlabel: str,
         controlIDs: list,
         experimentalIDs: list,
@@ -42,25 +44,25 @@ class DataMediator:
         **kwargs,
     ) -> None:
         self.dataframe = dataframe
+        self.testProportion = testProportion
         self.IDlabel = IDlabel
         self.randomSeed = randomSeed
 
         # split experimental & control data with given IDs
-        self.experimentalData = self.__splitDataFrame(experimentalIDs)
-        self.controlData = self.__splitDataFrame(controlIDs)
+        self.experimental = self.__splitDataFrame(experimentalIDs)
+        self.control = self.__splitDataFrame(controlIDs)
 
         # record initial state of dataframes
-        self.__experimentalData = self.experimentalData.copy(deep=True)
-        self.__controlData = self.controlData.copy(deep=True)
-        self.originalExperimentalIDs = self.__experimentalData.index.tolist()
-        self.originalControlIDs = self.__controlData.index.tolist()
+        self.__experimental = self.experimental.copy(deep=True)
+        self.__control = self.control.copy(deep=True)
+        self.originalExperimentalIDs = self.__experimental.index.tolist()
+        self.originalControlIDs = self.__control.index.tolist()
 
         # set flags
         # take holdouts before any data balancing
-        if "holdout" in kwargs:
-            self.holdoutProportion = kwargs["holdout"]
-            self.__createHoldout(self.holdoutProportion)
-            del kwargs["holdout"]
+        if "holdoutProportion" in kwargs:
+            self.holdoutProportion = kwargs["holdoutProportion"]
+            del kwargs["holdoutProportion"]
         for flag, value in kwargs.items():
             # TODO: refactor using match case upon python 3.10 release
             if flag == "balancingMethod":
@@ -151,32 +153,6 @@ class DataMediator:
 
         return self.dataframe.loc[[ID for ID in IDs if ID in self.dataframe.index]]
 
-    def __createHoldout(self, testSize: float) -> None:
-        """
-        Private method to randomly sequester samples into holdout dataframes.
-        Sequestered data is excluded from the experimental & control class variables.
-
-        Holdout dataframes may be accessed by the `experimentalHoldout` and
-        `controlHoldout` class variables.
-        """
-        if testSize > 1 or testSize < 0:
-            raise ValueError("Proportion must be in the range of (0, 1)")
-
-        self.controlHoldout = self.controlData.sample(
-            int(len(self.controlData) * testSize), random_state=self.randomSeed
-        )
-        self.experimentalHoldout = self.experimentalData.sample(
-            int(len(self.experimentalData) * testSize), random_state=self.randomSeed
-        )
-
-        # ignore chained assigment warning in Pandas since we are dropping rows in-place
-        pd.options.mode.chained_assignment = None
-        # remove holdouts from experimental & control data
-        self.controlData.drop(self.controlHoldout.index, inplace=True)
-        self.experimentalData.drop(self.experimentalHoldout.index, inplace=True)
-        # restore chained assignment warning
-        pd.options.mode.chained_assignment = "warn"
-
     def __balance(
         self,
         balancingMethod: str = "downsampling",
@@ -188,8 +164,8 @@ class DataMediator:
         are additional options. A custom sampling method callback may also be passed,
         which is called instead on split & holdout dataframes.
         """
-        largeSplit = max([self.experimentalData, self.controlData], key=len)
-        smallSplit = min([self.experimentalData, self.controlData], key=len)
+        largeSplit = max([self.experimental, self.control], key=len)
+        smallSplit = min([self.experimental, self.control], key=len)
 
         if hasattr(self, "verbose"):
             print(f"Unbalanced classes— {False if largeSplit == smallSplit else True}")
@@ -229,21 +205,17 @@ class DataMediator:
         Return number of features from the input dataframe. If features are
         stratified by row, set `columnStratified` to falsy.
         """
-        if hasattr(self, "trainingData") and hasattr(self, "testingData"):
-            trainingShape = self.trainingData.shape[
-                1 if columnStratified else 0
-            ]
-            testingShape = self.testingData.shape[1 if columnStratified else 0]
+        if hasattr(self, "train") and hasattr(self, "validation"):
+            trainingShape = self.train.shape[1 if columnStratified else 0]
+            testingShape = self.validation.shape[1 if columnStratified else 0]
             return (
                 testingShape
                 if testingShape == trainingShape
                 else "unmatched feature count between training & testing!"
             )
-        elif hasattr(self, "experimentalData") and hasattr(self, "controlData"):
-            experimentalShape = self.experimentalData.shape[
-                1 if columnStratified else 0
-            ]
-            controlShape = self.controlData.shape[1 if columnStratified else 0]
+        elif hasattr(self, "experimental") and hasattr(self, "control"):
+            experimentalShape = self.experimental.shape[1 if columnStratified else 0]
+            controlShape = self.control.shape[1 if columnStratified else 0]
             return (
                 controlShape
                 if controlShape == experimentalShape
@@ -254,48 +226,58 @@ class DataMediator:
 
     def resample(self, keepFilters=False) -> None:
         """
-        Reinitialize experimental & control data; redo holdout sequestration
-        and dataset balancing.
+        Reinitialize experimental & control data; redo dataset balancing.
         """
         if not keepFilters:
-            self.experimentalData = self.__experimentalData.copy(deep=True)
-            self.controlData = self.__controlData.copy(deep=True)
+            self.experimental = self.__experimental.copy(deep=True)
+            self.control = self.__control.copy(deep=True)
         if self.balancingMethod:
             self.__balance(self.balancingMethod, self.balancingMethodCallback)
-        if self.holdoutProportion:
-            self.__createHoldout(self.holdoutProportion)
+        self.trainTestSplit()
 
-    def trainTestSplit(self, testSize: float, stratifyByClass=True) -> None:
+    def trainTestSplit(self, stratifyByClass=True) -> None:
         """
-        Split control (class 0) and experimental data (class 1) by a given testSize into training/testing sets, with
-        classification targets.
+        Split control (class 0) and experimental data (class 1) by a given proportion into training/validation sets.
+        Also takes independent holdout if `holdoutProportion` was passed during initialization.
 
         [Input]
-            `testSize`: proportion of data to split for testing, between 0 and 1 \n
-            `stratify`: stratify class proportions when splitting \n
+            `stratifyByClass`: stratify class proportions when splitting \n
         [New attributes]
-            `trainingData` \n
-            `trainingLabels` \n
-            `testingData` \n
-            `testingLabels` \n
+            `train` \n
+            `trainLabels` \n
+            `validation` \n
+            `validationLabels` \n
+            `holdout` \n
+            `holdoutLabels` \n
             `trainTestIndex` \n
         """
-        allData = pd.concat([self.controlData, self.experimentalData])
-
-        totalLabels = np.array(
-            [0] * len(self.controlData) + [1] * len(self.experimentalData)
-        )
+        allData = pd.concat([self.control, self.experimental])
+        allLabels = np.array([0] * len(self.control) + [1] * len(self.experimental))
+        
+        if self.holdoutProportion:
+            testProportion = int(self.testProportion * len(allData))
+            (allData, self.holdout, allLabels, self.holdoutLabels,) = train_test_split(
+                allData.astype(int),
+                allLabels,
+                test_size=self.holdoutProportion,
+                stratify=allLabels if stratifyByClass else None,
+                random_state=self.randomSeed,
+            )
+        else:
+            testProportion = self.testProportion
+            
         self.trainTestIndex = allData.index.tolist()
+
         (
-            self.trainingData,
-            self.testingData,
-            self.trainingLabels,
-            self.testingLabels,
+            self.train,
+            self.validation,
+            self.trainLabels,
+            self.validationLabels,
         ) = train_test_split(
-            allData.astype(float),
-            totalLabels,
-            test_size=testSize,
-            stratify=totalLabels if stratifyByClass else None,
+            allData.astype(int),
+            allLabels,
+            test_size=testProportion,
+            stratify=allLabels if stratifyByClass else None,
             random_state=self.randomSeed,
         )
 
@@ -312,7 +294,7 @@ class DataMediator:
         """
         self.predictions = pd.DataFrame(
             {
-                "y_real": self.testingLabels if testData else self.trainingLabels,
+                "y_true": self.validationLabels if testData else self.trainLabels,
                 "y_pred": np.argmax(probabilities, axis=1),
                 "y_probas": list(probabilities),
             }

@@ -5,9 +5,7 @@ Summary: Modularize your machine learning pipelines.
 Home-page: https://github.com/finkbeiner-lab/tidyML
 Author: Eric Mockler
 Author-email: mock7ee@gmail.com
-License: UNKNOWN
 Project-URL: Bug Tracker, https://github.com/finkbeiner-lab/tidyML/issues
-Platform: UNKNOWN
 Classifier: Programming Language :: Python :: 3
 Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
@@ -27,6 +25,7 @@ and minimize duplication, which helps you write maintainable code.
 - #### ExperimentTracker
 
   - `NeptuneExperimentTracker`
+  - `WandbExperimentTracker`
 
 - #### HyperparameterOptimizer
 
@@ -43,5 +42,3 @@ and minimize duplication, which helps you write maintainable code.
 0. Install Python, open a terminal in the tidyML directory
 
 1. Install dependencies with `pip install -r requirements.txt`
-
-

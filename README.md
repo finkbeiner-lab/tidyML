@@ -10,6 +10,7 @@ and minimize duplication, which helps you write maintainable code.
 - #### ExperimentTracker
 
   - `NeptuneExperimentTracker`
+  - `WandbExperimentTracker`
 
 - #### HyperparameterOptimizer
 

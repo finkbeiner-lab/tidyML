@@ -75,7 +75,8 @@ class NeptuneExperimentTracker(ExperimentTracker):
         super().__init__(projectID, entityID, analysisName, **kwargs)
 
         self.apiToken = kwargs["apiToken"]
-        self.tempDir = "./temp"
+        # if os.path.exists(".neptune/temp"):
+        #     shutil.rmtree(".neptune/temp")
 
     def start(self, model):
         self.tracker = neptune.init(
@@ -86,6 +87,11 @@ class NeptuneExperimentTracker(ExperimentTracker):
         )
         self.addTags([model.__class__.__name__])
         self.model = model
+
+        # Neptune bug workaround: cache IO streams to disk (https://github.com/neptune-ai/neptune-client/issues/889)
+        # self.tempDir = os.path.join(os.getcwd(), ".neptune/temp")
+        # if not os.path.exists(self.tempDir):
+        #     os.makedirs(self.tempDir)
 
     def summarize(
         self,
@@ -106,10 +112,6 @@ class NeptuneExperimentTracker(ExperimentTracker):
         valueMap: dict,
         **kwargs,
     ):
-        # Neptune BytesIO bug workaround (https://github.com/neptune-ai/neptune-client/issues/889)
-        hash = random.getrandbits(256)
-        tempDir = os.path.join(os.getcwd(), "temp" + str(hash))
-        os.mkdir(tempDir)
         for (key, value) in valueMap.items():
             if isinstance(value, Figure):
                 fileHandle = BytesIO()
@@ -119,26 +121,26 @@ class NeptuneExperimentTracker(ExperimentTracker):
                 )
                 self.tracker[f"{path}/{key} preview"].upload(File.as_image(value))
             elif isinstance(value, DataFrame):
-                # tableStream = BytesIO()
-                tempFileName = os.path.join(tempDir, key) + ".csv"
-                value.to_csv(tempFileName, header=True, index=True)
+                tableStream = BytesIO()
+                # tempFileName = (
+                #     os.path.join(self.tempDir, key + str(random.getrandbits(32)))
+                #     + ".csv"
+                # )
+                value.to_csv(tableStream, header=True, index=True)
                 self.tracker[f"{path}/{key}"].upload(
-                    # File.from_stream(tableStream, extension="csv")
-                    tempFileName
+                    File.from_stream(tableStream, extension="csv")
+                    # tempFileName
                 )
-            elif "model" in key:
+            elif key == "model":
                 self.tracker[f"{path}/{key}"].upload(
                     File.from_stream(BytesIO(value), extension="pkl")
                 )
             elif isinstance(value, bytes):
-                tempFileName = os.path.join(tempDir, key) + ".bin"
                 self.tracker[f"{path}/{key}"].upload(
-                    # File.from_stream(BytesIO(value), extension="bin")
-                    tempFileName
+                    File.from_stream(BytesIO(value), extension="bin")
                 )
             else:
                 self.tracker[f"{path}/{key}"] = value
-        shutil.rmtree(tempDir)
 
     def addTags(self, tags: List):
         self.tracker["sys/tags"].add(tags)
